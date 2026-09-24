@@ -43,12 +43,14 @@ ${\color{red}\textbf{Rust is not a prerequisite}}$: taught as you go, as
 in the first book. ${\color{red}\textbf{Distributed systems are not a
 prerequisite}}$: every idea arrives with a plain-English analogy first.
 
-## The planned 16 days
+## The planned 18 days
 
 Planned, not yet built — day boundaries will be refined as the book is
-written. Same shape as the first course: days 0–5 free in this
-repository (a complete mini-Ray on one machine), days 6–15 in the Pro
-edition (the distributed half).
+written. Same shape as the first course, with a slightly longer paid
+half: the subject is bigger. Days 0–5 free in this repository (a complete
+mini-Ray on one machine), days 6–17 in the Pro edition (the distributed
+half). And nano, not Ray: the core runtime only — no autoscaler, no
+placement groups, none of the libraries (Serve, Data, Train, Tune).
 
 | Day | Theme | In plain words | ≈&nbsp;Time |
 |-----|-------|----------------|--------|
@@ -58,16 +60,18 @@ edition (the distributed half).
 | 3 | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2&nbsp;h |
 | 4 | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a quarter of its time, measured. | 2&nbsp;h |
 | 5 | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2&nbsp;h |
-| 6 | Crossing the machine line | Two processes on two machines talk over the network — and everything built so far still works. | 2.5&nbsp;h |
-| 7 | A cluster is born | A head node keeps the address book: nodes, actors, heartbeats; workers join and leave. | 2&nbsp;h |
-| 8 | Objects across machines | The pantry goes distributed: fetch what is remote, and track who owns what. | 2&nbsp;h |
-| 9 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
-| 10 | Distributed garbage | Ray's hardest question: when is an object safe to delete? Ownership and reference counting across machines. | 2.5&nbsp;h |
-| 11 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
-| 12 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
-| 13 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
-| 14 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
-| 15 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
+| 6 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2&nbsp;h |
+| 7 | Crossing the machine line | A worker on another machine runs your task over plain TCP — and everything built so far still works. | 2.5&nbsp;h |
+| 8 | A cluster is born | A head node keeps the address book: nodes, actors, heartbeats; workers join and leave. | 2&nbsp;h |
+| 9 | Objects across machines | The pantry goes distributed: find where a result lives and fetch it. | 2&nbsp;h |
+| 10 | Who owns what | Ray's hardest question: when is an object safe to delete? Ownership and reference counting across machines. | 2.5&nbsp;h |
+| 11 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
+| 12 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
+| 13 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
+| 14 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
+| 15 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
+| 16 | Resources and placement | Tasks declare what they need — CPU slots, GPU slots — and the scheduler honors the budget. | 2&nbsp;h |
+| 17 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
 
 ## The series
 
