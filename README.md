@@ -6,8 +6,10 @@ day at a time.
 
 **Status: in design.** This is the next book in the series that begins
 with [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust);
-writing starts when Volume 1 of that course completes. **Star or watch
-this repository** to catch the launch (and the launch discount).
+writing starts when Volume 1 of that course completes. **Each book in
+the series stands alone** — nothing here will require owning the other
+one. **Star or watch this repository** to catch the launch (and the
+launch discount).
 
 ## Why a distributed compute engine?
 
@@ -65,15 +67,17 @@ edition (the distributed half).
 | 12 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
 | 13 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
 | 14 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
-| 15 | The payoff: serve LLMs on it | Run the nano-vLLM engine from the first book as actors on your own cluster — two books, one machine room, one final benchmark. | 3&nbsp;h |
+| 15 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
 
-## Start with the first book
+## The series
 
-The series begins with
+Each book stands alone: you can start here, and nothing in this book
+will require the other. They meet only if you want them to — Day 15 can
+run the inference engine you build in
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
-— **days 0–5 are free there right now**, taking you from your first
-tensor to a full transformer decoder block. Day 15 of this book runs that
-engine on this cluster, so the two meet in the end.
+on this book's cluster — and owning one book will earn a discount on the
+next. New to both subjects? The vLLM book's **days 0–5 are free right
+now** and make a natural first taste of the format.
 
 ## License
 
