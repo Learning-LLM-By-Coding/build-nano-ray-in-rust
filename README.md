@@ -4,10 +4,10 @@ Build a distributed compute engine — a nano-[Ray](https://github.com/ray-proje
 — from an empty folder to a fault-tolerant cluster, in Rust, one tested
 day at a time.
 
-**Status: in design.** This is the next book in the series that begins
-with [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust);
-writing starts when Volume 1 of that course completes. **Each book in
-the series stands alone** — nothing here will require owning the other
+**Status: in design.** This book and
+[Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
+are two books of one series, written side by side. **Each book stands
+alone** — nothing here will require owning the other
 one. **Star or watch this repository** to catch the launch (and the
 launch discount).
 
