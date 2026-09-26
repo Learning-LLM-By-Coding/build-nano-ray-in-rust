@@ -67,6 +67,53 @@ Three honest reasons:
 And since the language is taught as you go (see Prerequisites), you pick
 up a working knowledge of Rust as a side effect — arguably a fourth reason.
 
+## Why this course?
+
+Knowing what each part of a distributed runtime does is not the same as
+knowing how the parts behave *together* — and the second kind of
+knowledge is the one you need when a job hangs, a node runs out of
+memory, or a cluster needs to grow. There are three common ways to learn
+Ray, and each one stops short of it:
+
+- **Using Ray shows you the outside.** You learn `@ray.remote`,
+  `ray.get`, and which settings are safe. But when a job stalls or objects
+  start spilling to disk, the dashboard only shows the symptom. The cause
+  lives in how the scheduler, the object store, and the ownership table
+  affect each other — and hiding that is exactly what a good runtime is
+  designed to do.
+
+- **Tutorials teach one part at a time.** There are excellent
+  explanations of tasks, of actors, of Ray's ownership paper. Each is
+  right on its own, but the hard questions sit *between* the parts. Why
+  does passing a ticket instead of its value change *where* the next task
+  runs? Why can't a result be deleted while a ticket to it is still held
+  on another machine? Why does losing one worker mean re-running tasks
+  that already finished? No single-part tutorial can show you those
+  answers, because each answer involves several parts at once.
+
+- **Reading the real source is a second job.** Ray is hundreds of
+  thousands of lines of C++ and Python, built for clusters of thousands
+  of machines and a whole family of libraries. The core ideas are all in
+  there, surrounded by everything production needs, and it is hard to
+  tell the load-bearing code from the rest.
+
+This course takes a fourth path: **build a nano version from scratch**,
+keeping only the load-bearing parts. You write every one of them, one day
+at a time, and each new part lands in a runtime that already works. So
+you watch every new part change how the old ones behave. The object store
+makes big results cheap to share — and then forces the question of when
+they can be deleted. A second machine doubles your capacity — and then
+makes *where* a task runs matter. Fault tolerance keeps answers arriving
+— and then depends on every result remembering how it was made. By the
+end you have not only built the parts; you have built the interactions
+between them, which is what every real distributed system is made of.
+
+The first six days will be free in this repository, and they build a
+complete mini-Ray on one machine — enough to try that experience end to
+end. The Pro edition carries the same runtime across machines: a real
+cluster, distributed objects and ownership, and recovery from worker,
+actor, and node failures.
+
 ## How it will work
 
 The same executable-book format as the first course — **git history is
