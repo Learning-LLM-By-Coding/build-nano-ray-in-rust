@@ -1,23 +1,30 @@
 mod worker;
 
 use std::thread;
+use std::time::{Duration, Instant};
 use worker::Worker;
+
+/// A deliberately slow function — any plain Rust function works as a task.
+fn slow_square(x: u64) -> u64 {
+    thread::sleep(Duration::from_millis(300));
+    x * x
+}
 
 fn main() {
     let worker = Worker::start("worker-0");
-    println!(
-        "main runs on thread {:?}",
-        thread::current().name().unwrap_or("?")
-    );
 
-    for n in 1..=3 {
-        worker.execute(Box::new(move || {
-            let name = thread::current().name().unwrap_or("?").to_string();
-            println!("job {n} runs on thread {name:?}");
-        }));
-    }
+    let clock = Instant::now();
+    let ticket = worker.submit(|| slow_square(7));
+    let submitted = clock.elapsed().as_millis();
+    println!("submitted slow_square(7); ticket in hand after {submitted} ms");
 
-    // Dropping the worker waits for its queue to empty, then stops the thread.
-    drop(worker);
-    println!("all jobs done; worker stopped");
+    let answer = ticket.get().expect("slow_square never fails");
+    let waited = round_to_100(clock.elapsed());
+    println!("get -> {answer} after about {waited} ms");
+}
+
+/// Timings wobble by a millisecond or two; rounding keeps every run's output
+/// identical.
+fn round_to_100(elapsed: Duration) -> u128 {
+    (elapsed.as_millis() + 50) / 100 * 100
 }

@@ -1,4 +1,5 @@
-use std::sync::mpsc::{self, Sender};
+use std::fmt;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
 /// A unit of work: any function the worker may call exactly once, safe to
@@ -38,6 +39,23 @@ impl Worker {
         // A dead worker drops the job unrun; section B turns that into an error.
         let _ = self.sender.as_ref().expect("worker is running").send(job);
     }
+
+    /// Hand `task` to the worker and return a ticket for its result at once.
+    pub fn submit<T, F>(&self, task: F) -> Ticket<T>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let (result_sender, result_receiver) = mpsc::channel();
+        self.execute(Box::new(move || {
+            let value = task();
+            // The caller may have thrown the ticket away; nobody to tell.
+            let _ = result_sender.send(value);
+        }));
+        Ticket {
+            receiver: result_receiver,
+        }
+    }
 }
 
 impl Drop for Worker {
@@ -50,11 +68,42 @@ impl Drop for Worker {
     }
 }
 
+/// Analogy: the numbered order ticket — proof you are owed a dish that may
+/// not be cooked yet.
+///
+/// The receiving end of a private one-result channel; `get` blocks until the
+/// task's result arrives.
+pub struct Ticket<T> {
+    receiver: Receiver<T>,
+}
+
+impl<T> Ticket<T> {
+    /// Wait until the task finishes, then hand over its result.
+    pub fn get(self) -> Result<T, TaskError> {
+        // If the job was dropped unrun, its sender is gone and recv fails.
+        self.receiver.recv().map_err(|_| TaskError {
+            message: "worker stopped before the task finished".to_string(),
+        })
+    }
+}
+
+/// Why a task produced no result.
+#[derive(Debug)]
+pub struct TaskError {
+    message: String,
+}
+
+impl fmt::Display for TaskError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "task failed: {}", self.message)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Worker;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
     use std::time::Duration;
 
@@ -92,5 +141,27 @@ mod tests {
         }));
         drop(worker);
         assert!(done.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn get_returns_the_task_result() {
+        let worker = Worker::start("worker-0");
+        assert_eq!(worker.submit(|| 6 * 7).get().unwrap(), 42);
+        let greeting = worker.submit(|| format!("hello from {}", "worker-0"));
+        assert_eq!(greeting.get().unwrap(), "hello from worker-0");
+    }
+
+    #[test]
+    fn submit_returns_before_the_task_finishes() {
+        let worker = Worker::start("worker-0");
+        let (open_gate, gate) = mpsc::channel::<()>();
+        // The task cannot finish until we open the gate...
+        let ticket = worker.submit(move || {
+            gate.recv().unwrap();
+            "cooked"
+        });
+        // ...yet we already hold its ticket. Now let it finish.
+        open_gate.send(()).unwrap();
+        assert_eq!(ticket.get().unwrap(), "cooked");
     }
 }
