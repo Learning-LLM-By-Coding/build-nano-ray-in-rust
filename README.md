@@ -11,16 +11,60 @@ alone** — nothing here will require owning the other
 one. **Star or watch this repository** to catch the launch (and the
 launch discount).
 
-## Why a distributed compute engine?
+## Why Ray?
 
-One machine eventually stops being enough — and the moment work spreads
-across machines, a new set of questions takes over: where should this
-task run, who owns that result, what happens when a worker (or a whole
-node) dies mid-job? Ray is the open-source answer much of modern ML
-infrastructure runs on, and its core ideas — tasks, actors, a shared
-object store, lineage-based fault tolerance — fit in one head when you
-build them yourself. Same conviction as the first book: using a system
-teaches its flags; building one teaches its physics.
+[Ray](https://github.com/ray-project/ray) is the open-source runtime that
+much of modern ML infrastructure quietly runs on: training jobs spread over
+hundreds of GPUs, batch inference over billions of rows, model serving that
+scales up and down with traffic. When a large ML workload spans more than
+one machine, there is a good chance a Ray-shaped runtime is doing the
+spreading.
+
+- **One machine eventually stops being enough — and then the questions
+  change.** Where should this task run? Who owns that result, and when is
+  it safe to delete? What happens when a worker, or a whole machine, dies
+  halfway through a job? Those questions are the day-by-day syllabus below,
+  and they are the same ones every distributed system answers, from Spark
+  to Kubernetes controllers.
+
+- **Ray's answers are small enough to build.** Its core is a handful of
+  ideas — tasks, tickets for results that don't exist yet (`ObjectRef`s),
+  a shared object store, actors, lineage-based recovery — that fit in one
+  head once you have typed them yourself. That makes it the ideal teacher
+  for distributed systems in general, not just for Ray.
+
+- **Using a system teaches its flags; building one teaches its physics.**
+  After you have written the scheduler, the ownership table, and the
+  recovery path with your own hands, a stuck job, a spilled object, or a
+  lost node stops being a mystery in a dashboard: you know which mechanism
+  is involved and what it is waiting on.
+
+## Why Rust?
+
+Fair question — Ray itself is Python on the surface and C++ underneath.
+Three honest reasons:
+
+- **Concurrency is the subject, and Rust makes it checkable.** Threads,
+  channels, shared state, messages crossing machines — this book is
+  concurrency from Day 1. Rust refuses to compile a data race: a value
+  shared between threads has to say *how* it is shared. So the compiler
+  becomes a second teacher for exactly the lesson on the page, instead of
+  a race showing up once in a thousand runs.
+
+- **Ownership is literally a chapter.** Ray's hardest problem — when is a
+  result no longer needed anywhere in the cluster? — is an ownership
+  question. Rust makes you answer ownership questions for every value on
+  one machine; Day 10 extends the same idea across machines, and it lands
+  on ground you have been walking since Day 1.
+
+- **Every checkpoint has to work forever.** The whole course rests on
+  `git switch <any tag>` → green bar. One pinned toolchain, no
+  interpreter drift, few dependencies: Day 1 needs nothing beyond Rust's
+  standard library. A checkpoint that compiled on tag day still compiles
+  years later.
+
+And since the language is taught as you go (see Prerequisites), you pick
+up a working knowledge of Rust as a side effect — arguably a fourth reason.
 
 ## How it will work
 
@@ -76,7 +120,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 ## The series
 
 Each book stands alone: you can start here, and nothing in this book
-will require the other. They meet only if you want them to — Day 15 can
+will require the other. They meet only if you want them to — Day 17 can
 run the inference engine you build in
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
 on this book's cluster — and owning one book will earn a discount on the
