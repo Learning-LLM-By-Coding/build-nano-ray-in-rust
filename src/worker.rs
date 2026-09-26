@@ -1,4 +1,6 @@
+use std::any::Any;
 use std::fmt;
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
@@ -36,7 +38,7 @@ impl Worker {
 
     /// Queue `job` for the worker and return immediately. Fire and forget.
     pub fn execute(&self, job: Job) {
-        // A dead worker drops the job unrun; section B turns that into an error.
+        // If the worker is gone the job is dropped unrun (Ticket::get reports it).
         let _ = self.sender.as_ref().expect("worker is running").send(job);
     }
 
@@ -48,9 +50,11 @@ impl Worker {
     {
         let (result_sender, result_receiver) = mpsc::channel();
         self.execute(Box::new(move || {
-            let value = task();
+            // A panic inside the task stops here instead of killing the worker.
+            let outcome =
+                panic::catch_unwind(AssertUnwindSafe(task)).map_err(TaskError::from_panic);
             // The caller may have thrown the ticket away; nobody to tell.
-            let _ = result_sender.send(value);
+            let _ = result_sender.send(outcome);
         }));
         Ticket {
             receiver: result_receiver,
@@ -74,16 +78,19 @@ impl Drop for Worker {
 /// The receiving end of a private one-result channel; `get` blocks until the
 /// task's result arrives.
 pub struct Ticket<T> {
-    receiver: Receiver<T>,
+    receiver: Receiver<Result<T, TaskError>>,
 }
 
 impl<T> Ticket<T> {
     /// Wait until the task finishes, then hand over its result.
     pub fn get(self) -> Result<T, TaskError> {
-        // If the job was dropped unrun, its sender is gone and recv fails.
-        self.receiver.recv().map_err(|_| TaskError {
-            message: "worker stopped before the task finished".to_string(),
-        })
+        match self.receiver.recv() {
+            Ok(outcome) => outcome,
+            // The job was dropped unrun, so its sender is gone.
+            Err(_) => Err(TaskError {
+                message: "worker stopped before the task finished".to_string(),
+            }),
+        }
     }
 }
 
@@ -91,6 +98,21 @@ impl<T> Ticket<T> {
 #[derive(Debug)]
 pub struct TaskError {
     message: String,
+}
+
+impl TaskError {
+    /// Turn a panic's payload into a readable message. `panic!("literal")`
+    /// carries a `&str`; `panic!("{x}")` with formatting carries a `String`.
+    fn from_panic(payload: Box<dyn Any + Send>) -> TaskError {
+        let message = if let Some(text) = payload.downcast_ref::<&str>() {
+            text.to_string()
+        } else if let Some(text) = payload.downcast_ref::<String>() {
+            text.clone()
+        } else {
+            "task panicked".to_string()
+        };
+        TaskError { message }
+    }
 }
 
 impl fmt::Display for TaskError {
@@ -163,5 +185,32 @@ mod tests {
         // ...yet we already hold its ticket. Now let it finish.
         open_gate.send(()).unwrap();
         assert_eq!(ticket.get().unwrap(), "cooked");
+    }
+
+    #[test]
+    fn a_panicking_task_becomes_an_error_on_its_ticket() {
+        let worker = Worker::start("worker-0");
+        let ticket = worker.submit(|| -> u64 { panic!("the oven caught fire") });
+        let error = ticket.get().unwrap_err();
+        assert_eq!(error.to_string(), "task failed: the oven caught fire");
+    }
+
+    #[test]
+    fn formatted_panic_messages_survive_too() {
+        let worker = Worker::start("worker-0");
+        let table = 7;
+        let ticket = worker.submit(move || -> u64 { panic!("table {table} sent it back") });
+        assert_eq!(
+            ticket.get().unwrap_err().to_string(),
+            "task failed: table 7 sent it back"
+        );
+    }
+
+    #[test]
+    fn the_worker_survives_a_panicking_task() {
+        let worker = Worker::start("worker-0");
+        let bad = worker.submit(|| -> u64 { panic!("boom") });
+        assert!(bad.get().is_err());
+        assert_eq!(worker.submit(|| 3 * 3).get().unwrap(), 9);
     }
 }

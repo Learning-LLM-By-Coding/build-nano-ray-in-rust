@@ -40,6 +40,20 @@ first six days run on one laptop; the second half spreads the same engine
 across processes and machines, and still runs on one laptop if that is all
 you have.
 
+## One story holds it all together
+
+Every day adds a scene to one running story — a restaurant kitchen that
+grows into a chain — and each piece of the engine is one thing in it: a
+cook at the stove, an order ticket, a second restaurant across town.
+[The restaurant chain: an analogy to help you build the right mental model](story.md) keeps the whole story on one
+page. Read it once before you start, for a map of the course, and come
+back whenever an earlier idea gets fuzzy. In the chapters, a concept name
+with a dotted underline links there: click it, and a short reminder of
+what the concept is, what it is in the story, and which day introduced it
+opens right where you are reading. In the code, the story rides
+along too: every `Analogy:` comment is highlighted, so you can spot where a
+scene from the story meets the code that builds it.
+
 ## How the course works
 
 Each day is one chapter and one theme, built as **two to four related
@@ -100,7 +114,7 @@ Two rules keep the course honest:
    day's smoke command, and the book's own code examples all pass.
 
 2. **Naive before clever.** Every clever mechanism arrives after a slow,
-   obviously-correct version you already understand — so you can see
+   clearly correct version you already understand — so you can see
    exactly what the cleverness buys.
 
 Head to [Setup](setup.md) to get your toolchain ready.

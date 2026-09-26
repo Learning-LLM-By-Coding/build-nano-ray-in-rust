@@ -21,6 +21,18 @@ fn main() {
     let answer = ticket.get().expect("slow_square never fails");
     let waited = round_to_100(clock.elapsed());
     println!("get -> {answer} after about {waited} ms");
+
+    let burnt = worker.submit(|| -> u64 { panic!("the oven caught fire") });
+    match burnt.get() {
+        Ok(value) => println!("unexpected success: {value}"),
+        Err(error) => println!("get -> error: {error}"),
+    }
+
+    let next = worker
+        .submit(|| slow_square(3))
+        .get()
+        .expect("the worker is still alive");
+    println!("same worker, next task -> {next}");
 }
 
 /// Timings wobble by a millisecond or two; rounding keeps every run's output

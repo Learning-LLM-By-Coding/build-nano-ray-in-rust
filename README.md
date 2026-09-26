@@ -4,7 +4,8 @@ Build a distributed compute engine — a nano-[Ray](https://github.com/ray-proje
 — from an empty folder to a fault-tolerant cluster, in Rust, one tested
 day at a time.
 
-**Status: in design.** This book and
+**Status: being written — Days 0–1 are done** (read them in
+[`book/src`](book/src/introduction.md)). This book and
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
 are two books of one series, written side by side. **Each book stands
 alone** — nothing here will require owning the other
@@ -57,10 +58,10 @@ Three honest reasons:
   one machine; Day 10 extends the same idea across machines, and it lands
   on ground you have been walking since Day 1.
 
-- **Every checkpoint has to work forever.** The whole course rests on
-  `git switch <any tag>` → green bar. One pinned toolchain, no
-  interpreter drift, few dependencies: Day 1 needs nothing beyond Rust's
-  standard library. A checkpoint that compiled on tag day still compiles
+- **Every checkpoint has to work forever.** The whole course rests on one
+  promise: switch to any checkpoint tag, and the green bar passes. One
+  pinned toolchain, no interpreter drift, few dependencies: Day 1 needs
+  nothing beyond Rust's standard library. A checkpoint that compiled on tag day still compiles
   years later.
 
 And since the language is taught as you go (see Prerequisites), you pick
@@ -89,8 +90,8 @@ prerequisite}}$: every idea arrives with a plain-English analogy first.
 
 ## The planned 18 days
 
-Planned, not yet built — day boundaries will be refined as the book is
-written. Same shape as the first course, with a slightly longer paid
+Days 0–1 are built; the rest is planned, and day boundaries will be
+refined as the book is written. Same shape as the first course, with a slightly longer paid
 half: the subject is bigger. Days 0–5 free in this repository (a complete
 mini-Ray on one machine), days 6–17 in the Pro edition (the distributed
 half). And nano, not Ray: the core runtime only — no autoscaler, no
