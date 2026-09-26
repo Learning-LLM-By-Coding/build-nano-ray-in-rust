@@ -108,7 +108,9 @@ makes *where* a task runs matter. Fault tolerance keeps answers arriving
 end you have not only built the parts; you have built the interactions
 between them, which is what every real distributed system is made of.
 
-The first six days will be free in this repository, and they build a
+The whole book runs on one story — a restaurant kitchen that grows into a
+chain — and [The restaurant chain: an analogy to help you build the right mental model](book/src/story.md) maps
+every concept onto it on a single page, one scene per finished day. The first six days will be free in this repository, and they build a
 complete mini-Ray on one machine — enough to try that experience end to
 end. The Pro edition carries the same runtime across machines: a real
 cluster, distributed objects and ownership, and recovery from worker,
