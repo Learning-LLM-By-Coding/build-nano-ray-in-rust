@@ -67,6 +67,27 @@ Three honest reasons:
 And since the language is taught as you go (see Prerequisites), you pick
 up a working knowledge of Rust as a side effect — arguably a fourth reason.
 
+## How it will work
+
+The same executable-book format as the first course — **git history is
+the curriculum**:
+
+- one commit and one immutable checkpoint tag per section, so any day's
+  exact state is one `git switch` away;
+
+- a green bar (`cargo fmt`, `clippy`, every test) passing at every
+  checkpoint;
+
+- every transcript in the book reproduced from real runs, never typed
+  from imagination.
+
+## Prerequisites (planned)
+
+Some programming experience, in any language — that is the whole list.
+${\color{red}\textbf{Rust is not a prerequisite}}$: taught as you go, as
+in the first book. ${\color{red}\textbf{Distributed systems are not a
+prerequisite}}$: every idea arrives with a plain-English analogy first.
+
 ## Why this course?
 
 Knowing what each part of a distributed runtime does is not the same as
@@ -108,34 +129,24 @@ makes *where* a task runs matter. Fault tolerance keeps answers arriving
 end you have not only built the parts; you have built the interactions
 between them, which is what every real distributed system is made of.
 
-The whole book runs on one story — a restaurant kitchen that grows into a
-chain — and [The restaurant chain: an analogy to help you build the right mental model](book/src/story.md) maps
-every concept onto it on a single page, one scene per finished day. The first six days will be free in this repository, and they build a
+**And one story carries you through the hard parts.** Distributed systems
+have famously slippery ideas — ownership, lineage, locality, "exactly
+once". You do not need to have studied any of them. Every concept arrives
+as part of one running story: a restaurant kitchen that grows into a
+chain. A worker is a cook at the stove. A task's result is an order ticket
+you hold before the food exists. A second machine is a second restaurant
+across town. So you meet each idea first as something you can picture, and
+only then as code.
+[The restaurant chain: an analogy to help you build the right mental model](book/src/story.md)
+keeps the whole story on one page, one scene per finished day: read it
+first for a tour of where the course goes, and come back whenever an idea
+gets fuzzy.
+
+The first six days will be free in this repository, and they build a
 complete mini-Ray on one machine — enough to try that experience end to
 end. The Pro edition carries the same runtime across machines: a real
 cluster, distributed objects and ownership, and recovery from worker,
 actor, and node failures.
-
-## How it will work
-
-The same executable-book format as the first course — **git history is
-the curriculum**:
-
-- one commit and one immutable checkpoint tag per section, so any day's
-  exact state is one `git switch` away;
-
-- a green bar (`cargo fmt`, `clippy`, every test) passing at every
-  checkpoint;
-
-- every transcript in the book reproduced from real runs, never typed
-  from imagination.
-
-## Prerequisites (planned)
-
-Some programming experience, in any language — that is the whole list.
-${\color{red}\textbf{Rust is not a prerequisite}}$: taught as you go, as
-in the first book. ${\color{red}\textbf{Distributed systems are not a
-prerequisite}}$: every idea arrives with a plain-English analogy first.
 
 ## The planned 18 days
 
