@@ -1,0 +1,8 @@
+[package]
+name = "nano-ray-rs"
+version = "0.0.1"
+edition = "2024"
+license-file = "LICENSE"
+description = "A tiny distributed compute engine built from scratch in Rust, one day at a time"
+
+[dependencies]
