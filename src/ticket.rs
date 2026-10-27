@@ -129,7 +129,6 @@ impl MemoryStore {
 ///
 /// An object id plus the store it lives in. Cloning copies the claim, not
 /// the result; every copy reads the same outcome.
-#[derive(Clone)]
 pub struct Ticket<T> {
     id: ObjectId,
     store: Arc<MemoryStore>,
@@ -157,15 +156,34 @@ impl<T> Ticket<T> {
     }
 }
 
-impl<T: Clone + 'static> Ticket<T> {
+// Written by hand: `#[derive(Clone)]` would demand `T: Clone`, yet copying
+// a ticket never copies a `T`.
+impl<T> Clone for Ticket<T> {
+    fn clone(&self) -> Ticket<T> {
+        Ticket::new(self.id, Arc::clone(&self.store))
+    }
+}
+
+impl<T: Send + Sync + 'static> Ticket<T> {
+    /// Analogy: look into the pot where it stands — no ladle, no second pot.
+    ///
+    /// Wait until the task finishes, then share its result: another pointer
+    /// to the one stored value, never a copy of it.
+    pub fn read(&self) -> Result<Arc<T>, TaskError> {
+        let value = self.store.get(self.id)?;
+        Ok(value
+            .downcast::<T>()
+            .expect("a ticket's type always matches its task's result"))
+    }
+
     /// Wait until the task finishes, then hand over a copy of its result.
     /// The result stays in the store, so any copy of the ticket can `get` it.
-    pub fn get(&self) -> Result<T, TaskError> {
-        let value = self.store.get(self.id)?;
-        let value = value
-            .downcast_ref::<T>()
-            .expect("a ticket's type always matches its task's result");
-        Ok(value.clone())
+    pub fn get(&self) -> Result<T, TaskError>
+    where
+        T: Clone,
+    {
+        let shared = self.read()?;
+        Ok(T::clone(&shared))
     }
 }
 
@@ -332,5 +350,19 @@ mod tests {
         let (tell, heard) = mpsc::channel();
         store.when_ready(id, Box::new(move || tell.send("ran").unwrap()));
         assert_eq!(heard.try_recv(), Ok("ran"));
+    }
+
+    #[test]
+    fn read_shares_the_stored_value_and_get_copies_it() {
+        let store = MemoryStore::new();
+        let id = store.new_id();
+        let ticket: Ticket<Vec<u8>> = Ticket::new(id, Arc::clone(&store));
+        store.put(id, Ok(Arc::new(vec![7_u8; 1000])));
+        let first = ticket.read().unwrap();
+        let second = ticket.read().unwrap();
+        assert!(Arc::ptr_eq(&first, &second), "two reads, one value");
+        let copy = ticket.get().unwrap();
+        assert_eq!(copy, *first);
+        assert_ne!(copy.as_ptr(), first.as_ptr(), "get hands over a copy");
     }
 }

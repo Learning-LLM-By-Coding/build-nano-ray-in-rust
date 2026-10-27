@@ -59,23 +59,24 @@ impl Worker {
         Ticket::new(id, Arc::clone(&self.store))
     }
 
-    /// Like `submit`, but `task` takes the result behind `input` as its
-    /// argument. Returns a ticket at once; the task joins the queue only
-    /// once `input` has landed. If `input` failed, `task` never runs and its
-    /// ticket carries the same error.
-    pub fn submit_with<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
+    /// Like `submit`, but `task` reads the result behind `input` in place: it
+    /// borrows the one stored value instead of getting a copy. Returns a
+    /// ticket at once; the task joins the queue only once `input` has landed.
+    /// If `input` failed, `task` never runs and its ticket carries the same
+    /// error.
+    pub fn submit_reading<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
     where
-        A: Clone + Send + Sync + 'static,
-        F: FnOnce(A) -> T + Send + 'static,
+        A: Send + Sync + 'static,
+        F: FnOnce(&A) -> T + Send + 'static,
         T: Send + Sync + 'static,
     {
         let id = self.store.new_id();
         let promise = Promise::new(id, Arc::clone(&self.store));
         let input_copy = input.clone();
         let job: Job = Box::new(move || {
-            // Already landed by the time this job runs, so `get` won't block.
-            let outcome = match input_copy.get() {
-                Ok(value) => run_catching(move || task(value)),
+            // Already landed by the time this job runs, so `read` won't block.
+            let outcome = match input_copy.read() {
+                Ok(value) => run_catching(move || task(&value)),
                 Err(error) => Err(error),
             };
             promise.keep(outcome);
@@ -86,6 +87,16 @@ impl Worker {
             let _ = sender.send(job);
         }));
         Ticket::new(id, Arc::clone(&self.store))
+    }
+
+    /// Like `submit_reading`, but `task` gets its own copy of the input value.
+    pub fn submit_with<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
+    where
+        A: Clone + Send + Sync + 'static,
+        F: FnOnce(A) -> T + Send + 'static,
+        T: Send + Sync + 'static,
+    {
+        self.submit_reading(input, move |value: &A| task(A::clone(value)))
     }
 }
 
@@ -371,5 +382,46 @@ mod tests {
             "task failed: table 7 sent it back"
         );
         assert_eq!(base.get().unwrap(), 7);
+    }
+
+    /// Where a byte vector's contents sit in memory.
+    fn address(bytes: &[u8]) -> usize {
+        bytes.as_ptr() as usize
+    }
+
+    #[test]
+    fn reading_tasks_all_see_the_one_stored_value() {
+        let worker = Worker::start("worker-0");
+        let stock = worker.submit(|| vec![7_u8; 1000]);
+        let readers: Vec<Ticket<usize>> = (0..3)
+            .map(|_| worker.submit_reading(&stock, |bytes: &Vec<u8>| address(bytes)))
+            .collect();
+        let home = address(&stock.read().unwrap());
+        for reader in readers {
+            assert_eq!(reader.get().unwrap(), home);
+        }
+    }
+
+    #[test]
+    fn submit_with_still_hands_each_task_its_own_copy() {
+        let worker = Worker::start("worker-0");
+        let stock = worker.submit(|| vec![7_u8; 1000]);
+        let copier = worker.submit_with(&stock, |bytes: Vec<u8>| address(&bytes));
+        assert_ne!(copier.get().unwrap(), address(&stock.read().unwrap()));
+    }
+
+    #[test]
+    fn a_value_that_cannot_be_copied_can_still_be_read() {
+        // No `Clone` here: `get` and `submit_with` would not compile for it.
+        struct Recipe {
+            steps: Vec<String>,
+        }
+        let worker = Worker::start("worker-0");
+        let recipe = worker.submit(|| Recipe {
+            steps: vec!["chop".to_string(), "simmer".to_string()],
+        });
+        let count = worker.submit_reading(&recipe, |recipe: &Recipe| recipe.steps.len());
+        assert_eq!(count.get().unwrap(), 2);
+        assert_eq!(recipe.read().unwrap().steps[1], "simmer");
     }
 }

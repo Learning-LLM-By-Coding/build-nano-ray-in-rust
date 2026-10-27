@@ -1,149 +1,99 @@
+mod meter;
 mod ticket;
 mod worker;
 
-use std::thread;
 use std::time::{Duration, Instant};
 use ticket::{Ticket, wait};
 use worker::Worker;
 
-/// A deliberately slow function — any plain Rust function works as a task.
-fn slow_square(x: u64) -> u64 {
-    thread::sleep(Duration::from_millis(300));
-    x * x
+/// Today's big value: 64 MiB.
+const STOCK_BYTES: usize = 64 * 1024 * 1024;
+
+/// A big result: 64 MiB of bytes, the pot of stock that many orders need.
+fn make_stock() -> Vec<u8> {
+    vec![7; STOCK_BYTES]
 }
 
-/// Plain one-argument functions, ready to be fed another task's result.
-/// They print so you can see when, and whether, the cook runs them.
-fn add_one(x: u64) -> u64 {
-    println!("    cook: add_one({x}) = {}", x + 1);
-    x + 1
-}
-
-fn double(x: u64) -> u64 {
-    println!("    cook: double({x}) = {}", x * 2);
-    x * 2
-}
-
-fn times_ten(x: u64) -> u64 {
-    println!("    cook: times_ten({x}) = {}", x * 10);
-    x * 10
-}
-
-/// A slow task that always fails: the dish burns after 300 ms on the stove.
-fn slow_burn() -> u64 {
-    thread::sleep(Duration::from_millis(300));
-    panic!("the oven caught fire")
+/// Where a value's bytes sit in memory. Equal addresses mean the very same
+/// bytes, not two copies.
+fn address(bytes: &[u8]) -> usize {
+    bytes.as_ptr() as usize
 }
 
 fn main() {
+    one_cook_copies_or_shares();
+}
+
+/// One cook makes the stock; eight tasks need it.
+fn one_cook_copies_or_shares() {
     let worker = Worker::start("worker-0");
+    let stock = worker.submit(make_stock);
+    let id = stock.id();
+    let (made, _) = wait(vec![stock.clone()], 1, Duration::from_secs(60));
+    println!(
+        "submit make_stock         -> ticket {id}, ready: {}",
+        made.len() == 1
+    );
 
-    let ticket = worker.submit(|| slow_square(7));
-    println!("submit slow_square(7) -> ticket {}", ticket.id());
+    let since = start_measuring();
+    let copy = stock.get().expect("the stock never burns");
+    let size = mib(copy.len());
+    println!(
+        "get {id}                    -> {size} MiB of bytes: {}",
+        cost(since)
+    );
 
-    let copy = ticket.clone();
-    println!("clone the ticket      -> ticket {}", copy.id());
-
-    let answer = ticket.get().expect("slow_square never fails");
-    println!("get ticket {}         -> {answer}", ticket.id());
-
-    let again = copy.get().expect("the dish is still on the pass");
-    println!("get the copy          -> {again}");
-
-    let burnt = worker.submit(slow_burn);
-    println!("submit a burning task -> ticket {}", burnt.id());
-
-    for attempt in 1..=2 {
-        match burnt.get() {
-            Ok(value) => println!("unexpected success: {value}"),
-            Err(error) => println!(
-                "get ticket {} (try {attempt}) -> error: {error}",
-                burnt.id()
-            ),
-        }
-    }
-
-    let orders: Vec<Ticket<u64>> = (1..=3)
-        .map(|x| worker.submit(move || slow_square(x)))
+    let since = start_measuring();
+    let copies: Vec<Ticket<usize>> = (0..8)
+        .map(|_| worker.submit_with(&stock, |bytes: Vec<u8>| address(&bytes)))
         .collect();
-    println!("submit 3 orders       -> tickets {}", numbers(&orders));
-    let clock = Instant::now();
+    let (copies, _) = wait(copies, 8, Duration::from_secs(60));
+    let done = copies.len();
+    println!("8 tasks, submit_with      -> {done} done: {}", cost(since));
 
-    let (ready, pending) = wait(orders, 1, Duration::from_secs(5));
-    show_wait("wait for 1, max 5 s  ", &ready, &pending, clock);
-
-    let (ready, pending) = wait(pending, 1, Duration::from_millis(100));
-    show_wait("wait for 1, max 0.1 s", &ready, &pending, clock);
-
-    let (ready, pending) = wait(pending, 2, Duration::from_secs(5));
-    show_wait("wait for 2, max 5 s  ", &ready, &pending, clock);
-
-    let (ready, _) = wait(vec![burnt], 1, Duration::ZERO);
+    let since = start_measuring();
+    let shared = stock.read().expect("the stock never burns");
+    let size = mib(shared.len());
     println!(
-        "wait on the burnt one -> ready {} (a failure counts as done)",
-        numbers(&ready)
+        "read {id}                   -> {size} MiB of bytes: {}",
+        cost(since)
     );
 
-    let base = worker.submit(|| slow_square(3));
-    println!("submit slow_square(3) -> ticket {}", base.id());
-    let plus_one = worker.submit_with(&base, add_one);
-    println!(
-        "submit add_one({})    -> ticket {}",
-        base.id(),
-        plus_one.id()
-    );
-    let doubled = worker.submit_with(&plus_one, double);
-    println!(
-        "submit double({})     -> ticket {}",
-        plus_one.id(),
-        doubled.id()
-    );
-    let tenfold = worker.submit_with(&base, times_ten);
-    println!(
-        "submit times_ten({})  -> ticket {}",
-        base.id(),
-        tenfold.id()
-    );
-    let (ready, _) = wait(vec![base.clone()], 1, Duration::ZERO);
-    println!("is {} ready yet?      -> {}", base.id(), !ready.is_empty());
+    let since = start_measuring();
+    let readers: Vec<Ticket<usize>> = (0..8)
+        .map(|_| worker.submit_reading(&stock, |bytes: &Vec<u8>| address(bytes)))
+        .collect();
+    let (readers, _) = wait(readers, 8, Duration::from_secs(60));
+    let done = readers.len();
+    println!("8 tasks, submit_reading   -> {done} done: {}", cost(since));
 
-    let answer = doubled.get().expect("nothing burns here");
-    println!("get ticket {}         -> {answer}", doubled.id());
-    let answer = tenfold.get().expect("nothing burns here");
-    println!("get ticket {}         -> {answer}", tenfold.id());
-
-    let ruined = worker.submit(slow_burn);
-    println!("submit slow_burn      -> ticket {}", ruined.id());
-    let rescue = worker.submit_with(&ruined, add_one);
-    println!(
-        "submit add_one({})   -> ticket {}",
-        ruined.id(),
-        rescue.id()
-    );
-    match rescue.get() {
-        Ok(value) => println!("unexpected success: {value}"),
-        Err(error) => println!("get ticket {}        -> error: {error}", rescue.id()),
-    }
+    let home = address(&shared);
+    let (copied, read) = (how_many_saw(&copies, home), how_many_saw(&readers, home));
+    println!("saw {id}'s own bytes        -> copies: {copied} of 8, readers: {read} of 8");
 }
 
-/// Print one `wait` step: which tickets are ready, and when that was.
-fn show_wait<T>(label: &str, ready: &[Ticket<T>], pending: &[Ticket<T>], clock: Instant) {
-    let at = round_to_100(clock.elapsed());
-    let (ready, pending) = (numbers(ready), numbers(pending));
-    println!("{label} -> ready {ready}, pending {pending} at about {at} ms");
-}
-
-/// Ticket numbers as a list, like `[#3, #4]`.
-fn numbers<T>(tickets: &[Ticket<T>]) -> String {
-    let ids: Vec<String> = tickets
+/// How many of `tasks` reported the address `home`.
+fn how_many_saw(tasks: &[Ticket<usize>], home: usize) -> usize {
+    tasks
         .iter()
-        .map(|ticket| ticket.id().to_string())
-        .collect();
-    format!("[{}]", ids.join(", "))
+        .filter(|task| matches!(task.get(), Ok(seen) if seen == home))
+        .count()
 }
 
-/// Timings wobble by a millisecond or two; rounding keeps every run's output
-/// identical.
-fn round_to_100(elapsed: Duration) -> u128 {
-    (elapsed.as_millis() + 50) / 100 * 100
+/// Start measuring: the meter's count and the clock, both as of now.
+fn start_measuring() -> (usize, Instant) {
+    (meter::allocated(), Instant::now())
+}
+
+/// Time passed and fresh memory allocated since `start_measuring`.
+fn cost(since: (usize, Instant)) -> String {
+    let (bytes, clock) = since;
+    let ms = clock.elapsed().as_secs_f64() * 1000.0;
+    let fresh = meter::allocated() - bytes;
+    format!("{ms:.1} ms, {:.1} MiB allocated", mib(fresh))
+}
+
+/// Bytes as mebibytes (1 MiB = 1024 × 1024 bytes).
+fn mib(bytes: usize) -> f64 {
+    bytes as f64 / (1024.0 * 1024.0)
 }
