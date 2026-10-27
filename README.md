@@ -170,7 +170,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 8&nbsp;✅&#8288;🔒 | A cluster is born | A head node keeps the address book: workers join and leave, check in on a heartbeat, and are declared dead when they go silent. | 3&nbsp;h |
 | 9&nbsp;✅&#8288;🔒 | Objects across machines | The pantry goes distributed: big results stay where they were made, and whoever needs one finds where it lives and fetches it from there. | 2.5&nbsp;h |
 | 10&nbsp;✅&#8288;🔒 | Who owns what | Ray's hardest question: when is an object safe to delete? The program that ordered it counts every reference — tasks in flight included — and frees it with the last one; when that program leaves, its objects go with it. | 2.5&nbsp;h |
-| 11&nbsp;🔒 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
+| 11&nbsp;✅&#8288;🔒 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy — and measure what moving the data costs. | 2&nbsp;h |
 | 12&nbsp;🔒 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
 | 13&nbsp;🔒 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
 | 14&nbsp;🔒 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
