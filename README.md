@@ -165,18 +165,22 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 3&nbsp;✅ | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2&nbsp;h |
 | 4&nbsp;✅ | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a bit more than a quarter of its time, measured. | 2&nbsp;h |
 | 5&nbsp;✅ | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2&nbsp;h |
-| 6 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2&nbsp;h |
-| 7 | Crossing the machine line | A worker on another machine runs your task over plain TCP — and everything built so far still works. | 2.5&nbsp;h |
-| 8 | A cluster is born | A head node keeps the address book: nodes, actors, heartbeats; workers join and leave. | 2&nbsp;h |
-| 9 | Objects across machines | The pantry goes distributed: find where a result lives and fetch it. | 2&nbsp;h |
-| 10 | Who owns what | Ray's hardest question: when is an object safe to delete? Ownership and reference counting across machines. | 2.5&nbsp;h |
-| 11 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
-| 12 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
-| 13 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
-| 14 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
-| 15 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
-| 16 | Resources and placement | Tasks declare what they need — CPU slots, GPU slots — and the scheduler honors the budget. | 2&nbsp;h |
-| 17 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
+| 6&nbsp;✅&#8288;🔒 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2.5&nbsp;h |
+| 7&nbsp;✅&#8288;🔒 | Crossing the machine line | A worker in a process of its own runs your task over plain TCP — the code another machine needs — and everything built so far still works. | 2.5&nbsp;h |
+| 8&nbsp;✅&#8288;🔒 | A cluster is born | A head node keeps the address book: workers join and leave, check in on a heartbeat, and are declared dead when they go silent. | 3&nbsp;h |
+| 9&nbsp;🔒 | Objects across machines | The pantry goes distributed: find where a result lives and fetch it. | 2&nbsp;h |
+| 10&nbsp;🔒 | Who owns what | Ray's hardest question: when is an object safe to delete? Ownership and reference counting across machines. | 2.5&nbsp;h |
+| 11&nbsp;🔒 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
+| 12&nbsp;🔒 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
+| 13&nbsp;🔒 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
+| 14&nbsp;🔒 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
+| 15&nbsp;🔒 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
+| 16&nbsp;🔒 | Resources and placement | Tasks declare what they need — CPU slots, GPU slots — and the scheduler honors the budget. | 2&nbsp;h |
+| 17&nbsp;🔒 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
+
+✅ = finished — the day's chapter and checkpoint tags are in this repository.
+✅&#8288;🔒 = finished, in the Pro edition (launching soon — star or watch this repository to catch it).
+🔒 = Pro edition, still being written.
 
 ## The series
 
