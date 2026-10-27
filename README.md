@@ -168,7 +168,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 6&nbsp;✅&#8288;🔒 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2.5&nbsp;h |
 | 7&nbsp;✅&#8288;🔒 | Crossing the machine line | A worker in a process of its own runs your task over plain TCP — the code another machine needs — and everything built so far still works. | 2.5&nbsp;h |
 | 8&nbsp;✅&#8288;🔒 | A cluster is born | A head node keeps the address book: workers join and leave, check in on a heartbeat, and are declared dead when they go silent. | 3&nbsp;h |
-| 9&nbsp;🔒 | Objects across machines | The pantry goes distributed: find where a result lives and fetch it. | 2&nbsp;h |
+| 9&nbsp;✅&#8288;🔒 | Objects across machines | The pantry goes distributed: big results stay where they were made, and whoever needs one finds where it lives and fetches it from there. | 2.5&nbsp;h |
 | 10&nbsp;🔒 | Who owns what | Ray's hardest question: when is an object safe to delete? Ownership and reference counting across machines. | 2.5&nbsp;h |
 | 11&nbsp;🔒 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy. | 2&nbsp;h |
 | 12&nbsp;🔒 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2&nbsp;h |
