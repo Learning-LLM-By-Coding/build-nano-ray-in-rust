@@ -82,10 +82,13 @@ impl<S> Drop for Actor<S> {
 #[cfg(test)]
 mod tests {
     use super::Actor;
-    use crate::ticket::{MemoryStore, Ticket};
+    use crate::pool::Pool;
+    use crate::ticket::{MemoryStore, Ticket, put, wait};
+    use crate::worker::Submit;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, mpsc};
     use std::thread;
+    use std::time::Duration;
 
     /// The name of the thread running this code.
     fn thread_name() -> String {
@@ -159,5 +162,69 @@ mod tests {
         }
         drop(counter);
         assert_eq!(done.load(Ordering::SeqCst), 10);
+    }
+
+    #[test]
+    fn two_actors_work_at_the_same_time() {
+        let store = MemoryStore::new();
+        let one = Actor::start("one", &store, 0_u64);
+        let two = Actor::start("two", &store, 0_u64);
+        let (open_gate, gate) = mpsc::channel::<()>();
+        let stuck = one.call(move |_: &mut u64| gate.recv().unwrap());
+        let quick = two.call(|count: &mut u64| *count + 1);
+        // `one` is stuck behind the gate; only `two` can answer.
+        let (ready_now, _) = wait(vec![quick], 1, Duration::from_secs(10));
+        open_gate.send(()).unwrap();
+        assert_eq!(ready_now.len(), 1, "the other actor answered");
+        stuck.get().unwrap();
+    }
+
+    #[test]
+    fn actor_tickets_share_the_pass_with_tasks_and_puts() {
+        let store = MemoryStore::new();
+        let crew = Pool::start(2, &store);
+        let counter = Actor::start("counter", &store, 0_u64);
+        let ids = [
+            crew.submit(|| 1_u64).id().to_string(),
+            counter.call(|count: &mut u64| *count).id().to_string(),
+            put(&store, 3_u64).id().to_string(),
+        ];
+        assert_eq!(ids, ["#1", "#2", "#3"]);
+    }
+
+    #[test]
+    fn a_task_reads_an_actors_result() {
+        let store = MemoryStore::new();
+        let crew = Pool::start(2, &store);
+        let counter = Actor::start("counter", &store, 20_u64);
+        let count = counter.call(|count: &mut u64| {
+            *count += 1;
+            *count
+        });
+        let doubled = crew.submit_reading(&count, |count: &u64| count * 2);
+        assert_eq!(doubled.get().unwrap(), 42);
+    }
+
+    #[test]
+    fn a_panicking_call_becomes_an_error_and_the_actor_carries_on() {
+        let counter = Actor::start("counter", &MemoryStore::new(), 7_u64);
+        let burnt = counter.call(|_: &mut u64| -> u64 { panic!("the glass slipped") });
+        assert_eq!(
+            burnt.get().unwrap_err().to_string(),
+            "task failed: the glass slipped"
+        );
+        assert_eq!(counter.call(|count: &mut u64| *count).get().unwrap(), 7);
+    }
+
+    #[test]
+    fn a_panic_keeps_what_the_call_changed_before_it() {
+        let counter = Actor::start("counter", &MemoryStore::new(), 0_u64);
+        let burnt = counter.call(|count: &mut u64| -> u64 {
+            *count += 1;
+            panic!("halfway through")
+        });
+        assert!(burnt.get().is_err());
+        // Nothing rolls back: the change made before the panic stays.
+        assert_eq!(counter.call(|count: &mut u64| *count).get().unwrap(), 1);
     }
 }

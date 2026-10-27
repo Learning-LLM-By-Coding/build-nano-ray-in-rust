@@ -37,6 +37,7 @@ fn main() {
     more_cooks_less_time();
     a_tab_on_the_crew();
     a_bartender_keeps_the_tab();
+    two_bartenders_one_pass();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -419,6 +420,11 @@ impl Tabs {
     fn close(&mut self, table: u32) -> u64 {
         self.by_table.remove(&table).unwrap_or(0)
     }
+
+    /// What `table` owes so far, leaving its tab open.
+    fn owed(&self, table: u32) -> u64 {
+        self.by_table.get(&table).copied().unwrap_or(0)
+    }
 }
 
 /// Wait for the evening's three drinks and the bill, then print the bill,
@@ -481,6 +487,55 @@ fn a_bartender_keeps_the_tab() {
     println!(
         "  still on the tab        -> ${}",
         left.get().expect("no drink spills")
+    );
+}
+
+/// Two bartenders on one pass: each keeps tabs of their own, neither waits
+/// for the other, a cook reads what one of them hands out, and a glass slips.
+fn two_bartenders_one_pass() {
+    let pass = MemoryStore::new();
+    let crew = Pool::start(2, &pass);
+    let bartenders = [
+        Actor::start("bartender-1", &pass, Tabs::default()),
+        Actor::start("bartender-2", &pass, Tabs::default()),
+    ];
+    let clock = Instant::now();
+    let cocktail = bartenders[0].call(|tabs: &mut Tabs| {
+        thread::sleep(Duration::from_millis(300));
+        tabs.add(4, 12)
+    });
+    let beer = bartenders[1].call(|tabs: &mut Tabs| tabs.add(7, 6));
+    for (who, table, ticket) in [
+        ("bartender-2's beer", 7, &beer),
+        ("bartender-1's cocktail", 4, &cocktail),
+    ] {
+        let tab = ticket.get().expect("no drink spills");
+        println!(
+            "{who:<26}-> ticket {}, table {table}'s tab: ${tab}, after about {} ms",
+            ticket.id(),
+            round_to_100(clock.elapsed())
+        );
+    }
+
+    let bill = bartenders[0].call(|tabs: &mut Tabs| tabs.close(4));
+    let each = crew.submit_reading(&bill, |bill: &u64| bill / 2);
+    println!(
+        "a cook splits bill {}     -> ticket {}, ${} each for 2 guests",
+        bill.id(),
+        each.id(),
+        each.get().expect("splitting never burns")
+    );
+
+    let slipped = bartenders[1].call(|tabs: &mut Tabs| -> u64 {
+        tabs.add(7, 6);
+        panic!("the glass slipped")
+    });
+    let error = slipped.get().expect_err("the glass always slips");
+    println!("another beer, table 7     -> {error}");
+    let owed = bartenders[1].call(|tabs: &mut Tabs| tabs.owed(7));
+    println!(
+        "table 7's tab after that  -> ${}",
+        owed.get().expect("reading a tab never burns")
     );
 }
 
