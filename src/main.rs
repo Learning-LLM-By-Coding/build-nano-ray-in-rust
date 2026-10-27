@@ -2,8 +2,9 @@ mod meter;
 mod ticket;
 mod worker;
 
+use std::thread;
 use std::time::{Duration, Instant};
-use ticket::{Ticket, wait};
+use ticket::{MemoryStore, Ticket, wait};
 use worker::Worker;
 
 /// Today's big value: 64 MiB.
@@ -22,6 +23,7 @@ fn address(bytes: &[u8]) -> usize {
 
 fn main() {
     one_cook_copies_or_shares();
+    two_cooks_one_pass();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -78,6 +80,53 @@ fn how_many_saw(tasks: &[Ticket<usize>], home: usize) -> usize {
         .iter()
         .filter(|task| matches!(task.get(), Ok(seen) if seen == home))
         .count()
+}
+
+/// Two cooks share one pass: one numbering, and each reads the other's dishes.
+fn two_cooks_one_pass() {
+    let pass = MemoryStore::new();
+    let cooks = [
+        Worker::start_in("worker-1", &pass),
+        Worker::start_in("worker-2", &pass),
+    ];
+    let quick = cooks[0].submit(|| 1_u64);
+    println!("worker-1's quick dish     -> ticket {}", quick.id());
+    let slow = cooks[1].submit(|| {
+        thread::sleep(Duration::from_secs(1));
+        2_u64
+    });
+    println!("worker-2's slow dish      -> ticket {}", slow.id());
+    let clock = Instant::now();
+    let (ready, _) = wait(vec![quick, slow], 2, Duration::from_secs(5));
+    let after = round_to_100(clock.elapsed());
+    println!(
+        "wait for both, max 5 s    -> {} ready after about {after} ms",
+        ready.len()
+    );
+
+    let stock = cooks[0].submit(make_stock);
+    let id = stock.id();
+    let home = address(&stock.read().expect("the stock never burns"));
+    println!("worker-1 makes the stock  -> ticket {id}");
+    let since = start_measuring();
+    let reader = cooks[1].submit_reading(&stock, |bytes: &Vec<u8>| (cook_name(), address(bytes)));
+    let (cook, seen) = reader.get().expect("reading never burns");
+    let own = seen == home;
+    println!(
+        "{cook} reads {id}         -> {id}'s own bytes: {own}, {}",
+        cost(since)
+    );
+}
+
+/// The name of the thread running this code: inside a task, the cook's name.
+fn cook_name() -> String {
+    thread::current().name().unwrap_or("?").to_string()
+}
+
+/// Timings wobble by a millisecond or two; rounding keeps every run's output
+/// identical.
+fn round_to_100(elapsed: Duration) -> u128 {
+    (elapsed.as_millis() + 50) / 100 * 100
 }
 
 /// Start measuring: the meter's count and the clock, both as of now.

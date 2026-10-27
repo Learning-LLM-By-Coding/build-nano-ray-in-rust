@@ -22,8 +22,17 @@ pub struct Worker {
 }
 
 impl Worker {
-    /// Start a named worker thread, waiting for jobs.
+    /// Start a named worker thread, waiting for jobs, with a pass of its own.
     pub fn start(name: &str) -> Worker {
+        Worker::start_in(name, &MemoryStore::new())
+    }
+
+    /// Analogy: hire a cook into a kitchen whose pass is already there — every
+    /// cook in the kitchen puts dishes on the same pass.
+    ///
+    /// Start a named worker thread whose results land in `store`, which other
+    /// workers may share. One store means one numbering and one place to look.
+    pub fn start_in(name: &str, store: &Arc<MemoryStore>) -> Worker {
         let (sender, receiver) = mpsc::channel::<Job>();
         let handle = thread::Builder::new()
             .name(name.to_string())
@@ -37,7 +46,7 @@ impl Worker {
         Worker {
             sender: Some(sender),
             handle: Some(handle),
-            store: MemoryStore::new(),
+            store: Arc::clone(store),
         }
     }
 
@@ -190,7 +199,7 @@ impl fmt::Display for TaskError {
 #[cfg(test)]
 mod tests {
     use super::{Promise, Worker};
-    use crate::ticket::{MemoryStore, Ticket};
+    use crate::ticket::{MemoryStore, Ticket, wait};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
@@ -423,5 +432,53 @@ mod tests {
         let count = worker.submit_reading(&recipe, |recipe: &Recipe| recipe.steps.len());
         assert_eq!(count.get().unwrap(), 2);
         assert_eq!(recipe.read().unwrap().steps[1], "simmer");
+    }
+
+    #[test]
+    fn workers_on_one_store_share_one_numbering() {
+        let store = MemoryStore::new();
+        let one = Worker::start_in("worker-1", &store);
+        let two = Worker::start_in("worker-2", &store);
+        let ids = [
+            one.submit(|| 1_u64).id().to_string(),
+            two.submit(|| 2_u64).id().to_string(),
+            one.submit(|| 3_u64).id().to_string(),
+        ];
+        assert_eq!(ids, ["#1", "#2", "#3"]);
+    }
+
+    #[test]
+    fn wait_sees_results_from_every_worker_on_the_store() {
+        let store = MemoryStore::new();
+        let one = Worker::start_in("worker-1", &store);
+        let two = Worker::start_in("worker-2", &store);
+        let (open_gate, gate) = mpsc::channel::<()>();
+        let quick = one.submit(|| 1_u64);
+        let held = two.submit(move || {
+            gate.recv().unwrap();
+            2_u64
+        });
+        // worker-1's dish has landed; worker-2's is still behind the gate.
+        quick.get().unwrap();
+        let (ready_now, _) = wait(vec![quick.clone(), held.clone()], 2, Duration::ZERO);
+        assert_eq!(ready_now.len(), 1, "only worker-1's dish is ready");
+        open_gate.send(()).unwrap();
+        // A generous timeout: the test passes only if worker-2's dish is seen.
+        let (ready_now, _) = wait(vec![quick, held], 2, Duration::from_secs(60));
+        assert_eq!(ready_now.len(), 2);
+    }
+
+    #[test]
+    fn one_worker_reads_another_workers_result_in_place() {
+        let store = MemoryStore::new();
+        let one = Worker::start_in("worker-1", &store);
+        let two = Worker::start_in("worker-2", &store);
+        let stock = one.submit(|| vec![7_u8; 1000]);
+        let reader = two.submit_reading(&stock, |bytes: &Vec<u8>| {
+            let cook = thread::current().name().unwrap_or("?").to_string();
+            (cook, address(bytes))
+        });
+        let home = address(&stock.read().unwrap());
+        assert_eq!(reader.get().unwrap(), ("worker-2".to_string(), home));
     }
 }

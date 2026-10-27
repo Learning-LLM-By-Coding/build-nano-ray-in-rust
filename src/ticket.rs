@@ -193,7 +193,7 @@ impl<T: Send + Sync + 'static> Ticket<T> {
 /// Like Ray's `ray.wait`: blocks until `num_ready` of `tickets` have results
 /// (a failed task counts as ready) or `timeout` passes, then splits them into
 /// `(ready, pending)`, each in the original order. All tickets must come from
-/// the same worker.
+/// the same store.
 pub fn wait<T>(
     tickets: Vec<Ticket<T>>,
     num_ready: usize,
