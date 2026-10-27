@@ -199,7 +199,7 @@ impl fmt::Display for TaskError {
 #[cfg(test)]
 mod tests {
     use super::{Promise, Worker};
-    use crate::ticket::{MemoryStore, Ticket, wait};
+    use crate::ticket::{MemoryStore, Ticket, put, wait};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
@@ -480,5 +480,43 @@ mod tests {
         });
         let home = address(&stock.read().unwrap());
         assert_eq!(reader.get().unwrap(), ("worker-2".to_string(), home));
+    }
+
+    #[test]
+    fn put_values_and_task_results_share_one_numbering() {
+        let store = MemoryStore::new();
+        let worker = Worker::start_in("worker-0", &store);
+        let ids = [
+            worker.submit(|| 1_u64).id().to_string(),
+            put(&store, 2_u64).id().to_string(),
+            worker.submit(|| 3_u64).id().to_string(),
+        ];
+        assert_eq!(ids, ["#1", "#2", "#3"]);
+    }
+
+    #[test]
+    fn a_put_value_feeds_tasks_like_any_result() {
+        let store = MemoryStore::new();
+        let worker = Worker::start_in("worker-0", &store);
+        let stock = put(&store, vec![7_u8; 1000]);
+        let home = address(&stock.read().unwrap());
+        let reader = worker.submit_reading(&stock, |bytes: &Vec<u8>| address(bytes));
+        let total = worker.submit_with(&stock, |bytes: Vec<u8>| bytes.len());
+        assert_eq!(reader.get().unwrap(), home);
+        assert_eq!(total.get().unwrap(), 1000);
+    }
+
+    #[test]
+    fn put_does_not_wait_for_a_busy_worker() {
+        let store = MemoryStore::new();
+        let worker = Worker::start_in("worker-0", &store);
+        let (open_gate, gate) = mpsc::channel::<()>();
+        let busy = worker.submit(move || gate.recv().unwrap());
+        // The worker is stuck behind the gate, yet the put value is ready.
+        let stock = put(&store, 5_u64);
+        let (ready_now, _) = wait(vec![stock], 1, Duration::ZERO);
+        assert_eq!(ready_now.len(), 1);
+        open_gate.send(()).unwrap();
+        busy.get().unwrap();
     }
 }

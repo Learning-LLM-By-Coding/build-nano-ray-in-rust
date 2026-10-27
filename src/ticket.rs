@@ -219,9 +219,21 @@ pub fn wait<T>(
     (ready, pending)
 }
 
+/// Analogy: the waiter stocks the pantry directly — no order slip, no cook —
+/// and gets a ticket for it at once.
+///
+/// Like Ray's `ray.put`: store `value` under a fresh id and return its ticket,
+/// already ready. The value moves in without being copied, and from now on it
+/// is shared, never changed.
+pub fn put<T: Send + Sync + 'static>(store: &Arc<MemoryStore>, value: T) -> Ticket<T> {
+    let id = store.new_id();
+    store.put(id, Ok(Arc::new(value)));
+    Ticket::new(id, Arc::clone(store))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MemoryStore, Outcome, Ticket, wait};
+    use super::{MemoryStore, Outcome, Ticket, put, wait};
     use crate::worker::Worker;
     use std::sync::{Arc, mpsc};
     use std::thread;
@@ -364,5 +376,23 @@ mod tests {
         let copy = ticket.get().unwrap();
         assert_eq!(copy, *first);
         assert_ne!(copy.as_ptr(), first.as_ptr(), "get hands over a copy");
+    }
+
+    #[test]
+    fn put_is_ready_at_once_and_needs_no_worker() {
+        let store = MemoryStore::new();
+        let ticket = put(&store, 42_u64);
+        let (ready_now, _) = wait(vec![ticket.clone()], 1, Duration::ZERO);
+        assert_eq!(ready_now.len(), 1);
+        assert_eq!(ticket.get().unwrap(), 42);
+    }
+
+    #[test]
+    fn put_moves_the_value_in_without_copying_it() {
+        let store = MemoryStore::new();
+        let bytes = vec![7_u8; 1000];
+        let home = bytes.as_ptr();
+        let ticket = put(&store, bytes);
+        assert_eq!(ticket.read().unwrap().as_ptr(), home);
     }
 }

@@ -4,7 +4,7 @@ mod worker;
 
 use std::thread;
 use std::time::{Duration, Instant};
-use ticket::{MemoryStore, Ticket, wait};
+use ticket::{MemoryStore, Ticket, put, wait};
 use worker::Worker;
 
 /// Today's big value: 64 MiB.
@@ -24,6 +24,7 @@ fn address(bytes: &[u8]) -> usize {
 fn main() {
     one_cook_copies_or_shares();
     two_cooks_one_pass();
+    the_waiter_stocks_the_pantry();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -116,6 +117,48 @@ fn two_cooks_one_pass() {
         "{cook} reads {id}         -> {id}'s own bytes: {own}, {}",
         cost(since)
     );
+}
+
+/// The waiter brings a big value no cook made and puts it in the pantry once.
+fn the_waiter_stocks_the_pantry() {
+    let pass = MemoryStore::new();
+    let cooks = [
+        Worker::start_in("worker-1", &pass),
+        Worker::start_in("worker-2", &pass),
+    ];
+    let busy: Vec<Ticket<()>> = cooks
+        .iter()
+        .map(|cook| cook.submit(|| thread::sleep(Duration::from_millis(300))))
+        .collect();
+    println!(
+        "both cooks busy, 300 ms   -> tickets {} and {}",
+        busy[0].id(),
+        busy[1].id()
+    );
+
+    let delivery = make_stock();
+    let home = address(&delivery);
+    let since = start_measuring();
+    let stock = put(&pass, delivery);
+    let id = stock.id();
+    let (ready, _) = wait(vec![stock.clone()], 1, Duration::ZERO);
+    let ready = ready.len() == 1;
+    println!(
+        "put the delivery          -> ticket {id}, ready: {ready}, {}",
+        cost(since)
+    );
+    let (done, _) = wait(busy, 2, Duration::ZERO);
+    println!("cooks finished yet?       -> {} of 2", done.len());
+
+    let since = start_measuring();
+    let readers: Vec<Ticket<usize>> = (0..8)
+        .map(|n| cooks[n % 2].submit_reading(&stock, |bytes: &Vec<u8>| address(bytes)))
+        .collect();
+    let (readers, _) = wait(readers, 8, Duration::from_secs(5));
+    let done = readers.len();
+    println!("8 tasks on 2 cooks        -> {done} done: {}", cost(since));
+    let seen = how_many_saw(&readers, home);
+    println!("saw the delivery's bytes  -> {seen} of 8");
 }
 
 /// The name of the thread running this code: inside a task, the cook's name.

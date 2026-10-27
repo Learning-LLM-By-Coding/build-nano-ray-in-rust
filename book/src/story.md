@@ -30,6 +30,7 @@ introduced it, if you want the full explanation again.
 |-----|-------|------------------|
 | 1 | [One cook](#day-1--one-cook) | worker, task, ticket, get, task error |
 | 2 | [The pass gets numbered spots](#day-2--the-pass-gets-numbered-spots) | ticket number, the pass, the cook's stub, wait, held slip, error propagation |
+| 3 | [The pantry](#day-3--the-pantry) | the meter, the pantry, reading in place, one pass for the whole kitchen, put, sealed |
 
 ## Day 1 — one cook
 
@@ -160,3 +161,75 @@ burned, the pasta is never cooked; its spot gets a copy of the note.
 
 </div>
 
+## Day 3 — the pantry
+
+The kitchen discovers where its results really are. Every finished result
+sits, as one pot, in exactly one place — **the pantry** — and its spot on
+the pass holds only a label saying where. Collecting a dish the old way ladles a
+full copy into a fresh pot; a meter on the supply line shows what that
+costs when eight orders each need a huge pot of stock. So every task, and
+the waiter too, learns to look into the pot where it stands. A second cook joins, and the pass
+turns out to belong to the kitchen, not to a cook: one numbering, one
+place to look. Last, the waiter carries a delivery straight into the
+pantry — no slip, no cook — and everything in the pantry stays sealed, so
+any number of cooks can read it at once.
+
+<div class="concept" id="meter">
+
+**The meter — counting fresh memory** · [Day 3, section A](day-03-the-object-store.md)
+
+*What it is:* a global allocator that hands every memory request to the system's allocator and adds the request's size to a running total. A demo reads the total before and after a step, so copying shows up as a number. It is a measuring tool for the course, not part of Ray.
+
+*In the story:* a meter on the kitchen's supply line, counting every new pot the kitchen fills.
+
+</div>
+
+<div class="concept" id="pantry">
+
+**The pantry — where every value lives, once** · [Day 3, section A](day-03-the-object-store.md)
+
+*What it is:* each stored value — a task's result or a put value — sits in exactly one shared allocation (an `Arc`); the store's table holds only a pointer to it. Readers get more pointers to the same value, never copies, and the value is freed when the last pointer is gone. Ray's object store is both halves: the pantry (where values live) and [the pass](#the-pass) (`MemoryStore`, the numbered table of labels pointing into it). Ray keeps one per node, in shared memory.
+
+*In the story:* the pantry behind the pass. A spot on the pass holds a label saying where the pot stands; the pot itself is in the pantry.
+
+</div>
+
+<div class="concept" id="read-in-place">
+
+**Reading in place — a label, not a ladle** · [Day 3, section A](day-03-the-object-store.md)
+
+*What it is:* `Ticket::read` returns an `Arc<T>` pointing at the stored value, and `submit_reading` lends a task a read-only `&A` of its input; neither copies anything. `get` and `submit_with` remain, as "read, then copy." Ray's `ray.get` of a NumPy array is the same zero-copy read.
+
+*In the story:* looking into the pot where it stands, instead of having a fresh pot ladled out for you.
+
+</div>
+
+<div class="concept" id="shared-pass">
+
+**One pass for the whole kitchen — one store, many workers** · [Day 3, section B](day-03-the-object-store.md)
+
+*What it is:* `Worker::start_in(name, &store)` starts a worker whose results land on a pass (`MemoryStore`) that other workers share. One pass means one numbering, one place for `wait` to look, and — through the pantry behind it — every worker can read every other worker's results in place. Ray's object store is both halves, the pass and the pantry, one per node; its object ids are unique across the cluster.
+
+*In the story:* the pass belongs to the kitchen, not to a cook. Every cook puts dishes on it, and no two dishes ever share a number.
+
+</div>
+
+<div class="concept" id="put">
+
+**put — the waiter stocks the pantry** · [Day 3, section C](day-03-the-object-store.md)
+
+*What it is:* `put(&store, value)` stores a value the program already holds under a fresh id and returns its ticket, ready at once. No task and no worker are involved, and the value is moved in, not copied. Put values and task results share one store and one numbering. Ray's version is `ray.put`.
+
+*In the story:* the waiter carries a delivery straight into the pantry — no order slip, no cook, no waiting in line — and gets a ticket for it on the spot.
+
+</div>
+
+<div class="concept" id="sealed">
+
+**Sealed — nothing in the pantry changes** · [Day 3, section C](day-03-the-object-store.md)
+
+*What it is:* a stored value is immutable: readers get only shared references (`&T`), so the compiler refuses any attempt to change it. That is what makes sharing safe — readers need no lock, nobody sees a half-changed value, and a copy can never go stale. A changed version is a new value with a new id. Ray's objects are immutable for the same reasons.
+
+*In the story:* everything in the pantry is sealed. Cooks look; nobody pours anything back in.
+
+</div>
