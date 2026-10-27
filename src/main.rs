@@ -7,7 +7,7 @@ use pool::Pool;
 use std::thread;
 use std::time::{Duration, Instant};
 use ticket::{MemoryStore, Ticket, put, wait};
-use worker::Worker;
+use worker::{Submit, Worker};
 
 /// Today's big value: 64 MiB.
 const STOCK_BYTES: usize = 64 * 1024 * 1024;
@@ -29,6 +29,7 @@ fn main() {
     the_waiter_stocks_the_pantry();
     picked_by_hand();
     one_rail_for_the_crew();
+    the_crew_and_the_pantry();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -228,6 +229,55 @@ fn one_rail_for_the_crew() {
         .map(|&ms| crew.submit(move || cook_for(ms, clock)))
         .collect();
     report("one rail, a crew of 2", &slips);
+}
+
+/// Held slips and the pantry, through a crew of four.
+fn the_crew_and_the_pantry() {
+    let pass = MemoryStore::new();
+    let crew = Pool::start(4, &pass);
+    let clock = Instant::now();
+    let sauce = crew.submit(|| {
+        thread::sleep(Duration::from_millis(300));
+        "sauce".to_string()
+    });
+    let pasta = crew.submit_reading(&sauce, |sauce: &String| format!("pasta with {sauce}"));
+    let quick: Vec<Ticket<String>> = (0..3).map(|_| crew.submit(cook_name)).collect();
+    let (quick, _) = wait(quick, 3, Duration::from_secs(5));
+    println!(
+        "sauce cooking, pasta held -> {} quick slips done after about {} ms",
+        quick.len(),
+        round_to_100(clock.elapsed())
+    );
+    let dish = pasta.get().expect("the sauce never burns");
+    println!(
+        "{dish:<26}-> ready after about {} ms",
+        round_to_100(clock.elapsed())
+    );
+
+    let stock = put(&pass, make_stock());
+    let home = address(&stock.read().expect("a put value never burns"));
+    let since = start_measuring();
+    let readers: Vec<Ticket<(String, usize)>> = (0..8)
+        .map(|_| {
+            crew.submit_reading(&stock, |bytes: &Vec<u8>| {
+                thread::sleep(Duration::from_millis(50));
+                (cook_name(), address(bytes))
+            })
+        })
+        .collect();
+    let seen: Vec<(String, usize)> = readers
+        .iter()
+        .map(|reader| reader.get().expect("reading never burns"))
+        .collect();
+    println!("8 readers on a crew of 4  -> 8 done: {}", cost(since));
+    let mut cooks: Vec<&String> = seen.iter().map(|(cook, _)| cook).collect();
+    cooks.sort();
+    cooks.dedup();
+    let own = seen.iter().filter(|(_, at)| *at == home).count();
+    println!(
+        "cooks used, bytes seen    -> {} of 4 cooks, the stock's own bytes: {own} of 8",
+        cooks.len()
+    );
 }
 
 /// The name of the thread running this code: inside a task, the cook's name.

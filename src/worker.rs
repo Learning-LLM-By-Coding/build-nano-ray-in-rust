@@ -49,23 +49,36 @@ impl Worker {
             store: Arc::clone(store),
         }
     }
+}
+
+/// Analogy: anyone the waiter can hand an order slip to — a lone cook with a
+/// rail of their own, or a crew sharing one.
+///
+/// Turning functions into tasks, written once for every kind of worker: an
+/// implementor only says where its jobs go and which store its results land in.
+pub trait Submit {
+    /// The queue this worker (or crew) takes its jobs from.
+    fn queue(&self) -> &Sender<Job>;
+
+    /// The store its results land in.
+    fn store(&self) -> &Arc<MemoryStore>;
 
     /// Queue `job` for the worker and return immediately. Fire and forget.
-    pub fn execute(&self, job: Job) {
+    fn execute(&self, job: Job) {
         // If the worker is gone the job is dropped unrun (its Promise reports it).
-        let _ = self.sender.as_ref().expect("worker is running").send(job);
+        let _ = self.queue().send(job);
     }
 
     /// Hand `task` to the worker and return a ticket for its result at once.
-    pub fn submit<T, F>(&self, task: F) -> Ticket<T>
+    fn submit<T, F>(&self, task: F) -> Ticket<T>
     where
         F: FnOnce() -> T + Send + 'static,
         T: Send + Sync + 'static,
     {
-        let id = self.store.new_id();
-        let promise = Promise::new(id, Arc::clone(&self.store));
+        let id = self.store().new_id();
+        let promise = Promise::new(id, Arc::clone(self.store()));
         self.execute(Box::new(move || promise.keep(run_catching(task))));
-        Ticket::new(id, Arc::clone(&self.store))
+        Ticket::new(id, Arc::clone(self.store()))
     }
 
     /// Like `submit`, but `task` reads the result behind `input` in place: it
@@ -73,14 +86,14 @@ impl Worker {
     /// ticket at once; the task joins the queue only once `input` has landed.
     /// If `input` failed, `task` never runs and its ticket carries the same
     /// error.
-    pub fn submit_reading<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
+    fn submit_reading<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
     where
         A: Send + Sync + 'static,
         F: FnOnce(&A) -> T + Send + 'static,
         T: Send + Sync + 'static,
     {
-        let id = self.store.new_id();
-        let promise = Promise::new(id, Arc::clone(&self.store));
+        let id = self.store().new_id();
+        let promise = Promise::new(id, Arc::clone(self.store()));
         let input_copy = input.clone();
         let job: Job = Box::new(move || {
             // Already landed by the time this job runs, so `read` won't block.
@@ -90,22 +103,32 @@ impl Worker {
             };
             promise.keep(outcome);
         });
-        let sender = self.sender.clone().expect("worker is running");
+        let sender = self.queue().clone();
         input.when_ready(Box::new(move || {
             // As in `execute`: a job sent to a stopped worker is dropped unrun.
             let _ = sender.send(job);
         }));
-        Ticket::new(id, Arc::clone(&self.store))
+        Ticket::new(id, Arc::clone(self.store()))
     }
 
     /// Like `submit_reading`, but `task` gets its own copy of the input value.
-    pub fn submit_with<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
+    fn submit_with<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
     where
         A: Clone + Send + Sync + 'static,
         F: FnOnce(A) -> T + Send + 'static,
         T: Send + Sync + 'static,
     {
         self.submit_reading(input, move |value: &A| task(A::clone(value)))
+    }
+}
+
+impl Submit for Worker {
+    fn queue(&self) -> &Sender<Job> {
+        self.sender.as_ref().expect("worker is running")
+    }
+
+    fn store(&self) -> &Arc<MemoryStore> {
+        &self.store
     }
 }
 
@@ -120,7 +143,7 @@ impl Drop for Worker {
 }
 
 /// Run `task`, turning a panic into a `TaskError` instead of a dead thread.
-pub(crate) fn run_catching<T, F>(task: F) -> Outcome
+fn run_catching<T, F>(task: F) -> Outcome
 where
     F: FnOnce() -> T,
     T: Send + Sync + 'static,
@@ -136,14 +159,14 @@ where
 ///
 /// The duty to store one task's outcome. If the job is thrown away unrun,
 /// `Drop` stores a "worker stopped" error, so no `get` waits forever.
-pub(crate) struct Promise {
+struct Promise {
     id: ObjectId,
     store: Arc<MemoryStore>,
     kept: bool,
 }
 
 impl Promise {
-    pub(crate) fn new(id: ObjectId, store: Arc<MemoryStore>) -> Promise {
+    fn new(id: ObjectId, store: Arc<MemoryStore>) -> Promise {
         Promise {
             id,
             store,
@@ -152,7 +175,7 @@ impl Promise {
     }
 
     /// Store the task's outcome under the promised id.
-    pub(crate) fn keep(mut self, outcome: Outcome) {
+    fn keep(mut self, outcome: Outcome) {
         self.store.put(self.id, outcome);
         self.kept = true;
     }
@@ -198,7 +221,7 @@ impl fmt::Display for TaskError {
 
 #[cfg(test)]
 mod tests {
-    use super::{Promise, Worker};
+    use super::{Promise, Submit, Worker};
     use crate::ticket::{MemoryStore, Ticket, put, wait};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, mpsc};

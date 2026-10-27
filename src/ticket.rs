@@ -234,7 +234,7 @@ pub fn put<T: Send + Sync + 'static>(store: &Arc<MemoryStore>, value: T) -> Tick
 #[cfg(test)]
 mod tests {
     use super::{MemoryStore, Outcome, Ticket, put, wait};
-    use crate::worker::Worker;
+    use crate::worker::{Submit, Worker};
     use std::sync::{Arc, mpsc};
     use std::thread;
     use std::time::{Duration, Instant};
