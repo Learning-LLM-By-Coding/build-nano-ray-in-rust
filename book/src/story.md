@@ -31,6 +31,7 @@ introduced it, if you want the full explanation again.
 | 1 | [One cook](#day-1--one-cook) | worker, task, ticket, get, task error |
 | 2 | [The pass gets numbered spots](#day-2--the-pass-gets-numbered-spots) | ticket number, the pass, the cook's stub, wait, held slip, error propagation |
 | 3 | [The pantry](#day-3--the-pantry) | the meter, the pantry, reading in place, one pass for the whole kitchen, put, sealed |
+| 4 | [The crew](#day-4--the-crew) | the crew, one rail for the whole crew, anyone who takes slips, speedup, slip size |
 
 ## Day 1 — one cook
 
@@ -231,5 +232,68 @@ any number of cooks can read it at once.
 *What it is:* a stored value is immutable: readers get only shared references (`&T`), so the compiler refuses any attempt to change it. That is what makes sharing safe — readers need no lock, nobody sees a half-changed value, and a copy can never go stale. A changed version is a new value with a new id. Ray's objects are immutable for the same reasons.
 
 *In the story:* everything in the pantry is sealed. Cooks look; nobody pours anything back in.
+
+</div>
+
+## Day 4 — the crew
+
+The kitchen hires a **crew**. At first the waiter picks a cook for every
+slip, taking turns — and a quick slip waits behind a big slip on one
+cook's rail while the cook at the next stove stands idle. So the cooks
+give up their own rails: the waiter pins every slip to **one rail**, and
+whichever cook is free walks over and takes the next one. Held slips and
+the pantry work for the crew exactly as for a lone cook, because the
+waiter hands both the same kinds of slips. Last, the kitchen times a
+real job — counting primes — on crews of one, two, and four, and learns
+that a crew is only as fast as its last slip: smaller slips keep every
+cook busy to the end.
+
+<div class="concept" id="crew">
+
+**The crew — a worker pool** · [Day 4, section A](day-04-many-workers-one-scheduler.md)
+
+*What it is:* a fixed number of worker threads (`Pool`), started once and reused for every task, all taking jobs from one shared queue and putting results on one store. Ray starts a pool of worker processes on every node — by default about one per CPU core — and reuses them for task after task.
+
+*In the story:* a crew of cooks sharing one kitchen. No cook belongs to any slip; any free cook cooks the next one.
+
+</div>
+
+<div class="concept" id="shared-rail">
+
+**One rail for the whole crew — the scheduler** · [Day 4, section A](day-04-many-workers-one-scheduler.md)
+
+*What it is:* one channel whose receiving end is shared by every thread of the pool (`Arc<Mutex<Receiver<Job>>>`). A free thread locks it only long enough to take the next job, so whichever thread is free first gets the next job, and no job waits while a thread sits idle. That rule is today's scheduler. Ray's scheduler hands each waiting task to a free worker; ours lets free workers take tasks, which on one machine has the same effect.
+
+*In the story:* the waiter pins every slip to one rail and never picks a cook. A cook who is free walks to the rail, takes the first slip, and steps away before cooking it.
+
+</div>
+
+<div class="concept" id="submit-trait">
+
+**Anyone who takes slips — the `Submit` trait** · [Day 4, section B](day-04-many-workers-one-scheduler.md)
+
+*What it is:* a trait whose default methods — `execute`, `submit`, `submit_reading`, `submit_with` — are written once, on top of two methods each kind of worker supplies: `queue` (where its jobs go) and `store` (where its results land). A lone `Worker` and a `Pool` both implement it, so every kind of task works on both. In Ray, `f.remote()` looks the same however many workers stand behind it.
+
+*In the story:* the waiter hands a lone cook and a whole crew exactly the same slips — plain, held, or reading a pot in place.
+
+</div>
+
+<div class="concept" id="speedup">
+
+**Speedup — more cooks, less time, measured** · [Day 4, section C](day-04-many-workers-one-scheduler.md)
+
+*What it is:* the time a job takes on one worker divided by its time on N workers. It reaches N only when the whole job can be split into equal parts. Amdahl's law adds a cap: the part that cannot be split (handing out tasks, adding up answers) limits the speedup however many workers you add — on Day 4 that part takes well under a millisecond, so it starts to matter only once tasks cross a network. On Day 4's machine, a prime-counting job ran about 1.8× to 1.9× faster on two threads, and about 3.3× to 3.9× faster on four — never a clean 4×.
+
+*In the story:* a crew of four does not cook a big order in exactly a quarter of the time: the waiter still hands out every slip, and the order is done only when the last slip is.
+
+</div>
+
+<div class="concept" id="slip-size">
+
+**Slip size — how finely to cut a job** · [Day 4, section C](day-04-many-workers-one-scheduler.md)
+
+*What it is:* how much of a job one task carries: split the job into more tasks, and each one is smaller. Too few, unequal tasks leave workers idle while the last big one finishes; too many tiny tasks spend their time on per-task overhead. Ray's tips for first-time users warn against tiny tasks for that reason.
+
+*In the story:* cut a big order into a few large slips, and three cooks may wait for the fourth; cut it into crumbs, and the cooks spend the evening walking to the rail.
 
 </div>

@@ -91,7 +91,7 @@ see, tests, one deliberate way to break it, and a checkpoint.
 | 1 | A function runs elsewhere | Wrap a plain function as a task, hand it to a worker, and hold a ticket for the answer. | 1.5–2 h |
 | 2 | Tickets you can pass around | Results live behind ids: get them, wait on them, and pass a ticket to the next task before the food is ready. | 2–2.5 h |
 | 3 | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2 h |
-| 4 | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a quarter of its time, measured. | 2 h |
+| 4 | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a bit more than a quarter of its time, measured. | 2 h |
 | 5 | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2 h |
 | 6 | Speaking across the wire | Task calls and results become bytes and come back whole. | 2 h |
 | 7 | Crossing the machine line | A worker on another machine runs your task over plain TCP. | 2.5 h |

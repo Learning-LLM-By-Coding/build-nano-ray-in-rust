@@ -4,6 +4,7 @@ mod ticket;
 mod worker;
 
 use pool::Pool;
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 use ticket::{MemoryStore, Ticket, put, wait};
@@ -30,6 +31,7 @@ fn main() {
     picked_by_hand();
     one_rail_for_the_crew();
     the_crew_and_the_pantry();
+    more_cooks_less_time();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -280,6 +282,108 @@ fn the_crew_and_the_pantry() {
     );
 }
 
+/// The slow job: count the primes among the numbers 1 to `PRIME_LIMIT`.
+const PRIME_LIMIT: u64 = 6_000_000;
+
+/// Whether `n` is prime, the slow way: try every divisor up to its square
+/// root. Pure arithmetic, so it keeps one CPU core busy and nothing else.
+fn is_prime(n: u64) -> bool {
+    if n < 2 {
+        return false;
+    }
+    let mut divisor = 2;
+    while divisor * divisor <= n {
+        if n.is_multiple_of(divisor) {
+            return false;
+        }
+        divisor += 1;
+    }
+    true
+}
+
+/// How many of `numbers` are prime.
+fn count_primes(numbers: &[u64]) -> usize {
+    numbers.iter().filter(|n| is_prime(**n)).count()
+}
+
+/// Share `n` of `all`, when `all` is cut into `slips` runs of equal length.
+fn share(all: &[u64], n: usize, slips: usize) -> &[u64] {
+    let size = all.len().div_ceil(slips);
+    let start = (n * size).min(all.len());
+    let end = (start + size).min(all.len());
+    &all[start..end]
+}
+
+/// Count the primes in `numbers` on `crew`, cut into `slips` slips that each
+/// read their share in place; then add up the answers.
+fn count_on(crew: &Pool, numbers: &Ticket<Vec<u64>>, slips: usize) -> usize {
+    let tickets: Vec<Ticket<usize>> = (0..slips)
+        .map(|n| {
+            crew.submit_reading(numbers, move |all: &Vec<u64>| {
+                count_primes(share(all, n, slips))
+            })
+        })
+        .collect();
+    tickets
+        .iter()
+        .map(|ticket| ticket.get().expect("counting never burns"))
+        .sum()
+}
+
+/// Start a crew of `size` cooks on `pass`, run the job on it, and return
+/// the answer and how long it took.
+fn time_on(
+    pass: &Arc<MemoryStore>,
+    numbers: &Ticket<Vec<u64>>,
+    size: usize,
+    slips: usize,
+) -> (usize, f64) {
+    let crew = Pool::start(size, pass);
+    let clock = Instant::now();
+    let primes = count_on(&crew, numbers, slips);
+    (primes, ms_since(clock))
+}
+
+/// Milliseconds passed since `clock` started, with the fraction.
+fn ms_since(clock: Instant) -> f64 {
+    clock.elapsed().as_secs_f64() * 1000.0
+}
+
+/// One slow job on crews of 1, 2 and 4 cooks, timed.
+fn more_cooks_less_time() {
+    let cores = thread::available_parallelism().map_or(1, |n| n.get());
+    println!("this machine              -> {cores} cores");
+    let pass = MemoryStore::new();
+    let numbers = put(&pass, (1..=PRIME_LIMIT).collect::<Vec<u64>>());
+    println!("the job                   -> primes up to {PRIME_LIMIT}, as 16 slips");
+    let mut alone_ms = 0.0;
+    for size in [1, 2, 4] {
+        let (primes, ms) = time_on(&pass, &numbers, size, 16);
+        if size == 1 {
+            alone_ms = ms;
+        }
+        println!(
+            "a crew of {size}               -> {primes} primes in {ms:.0} ms, {:.2}x as fast as 1 cook",
+            alone_ms / ms
+        );
+    }
+
+    let all = numbers.read().expect("a put value never burns");
+    let clock = Instant::now();
+    let first = count_primes(share(&all, 0, 16));
+    let first_ms = ms_since(clock);
+    let clock = Instant::now();
+    let last = count_primes(share(&all, 15, 16));
+    let last_ms = ms_since(clock);
+    println!("slip 1 alone              -> {first} primes in {first_ms:.0} ms");
+    println!("slip 16 alone             -> {last} primes in {last_ms:.0} ms");
+    let (primes, ms) = time_on(&pass, &numbers, 4, 64);
+    println!(
+        "a crew of 4, 64 slips     -> {primes} primes in {ms:.0} ms, {:.2}x as fast as 1 cook",
+        alone_ms / ms
+    );
+}
+
 /// The name of the thread running this code: inside a task, the cook's name.
 fn cook_name() -> String {
     thread::current().name().unwrap_or("?").to_string()
@@ -307,4 +411,40 @@ fn cost(since: (usize, Instant)) -> String {
 /// Bytes as mebibytes (1 MiB = 1024 × 1024 bytes).
 fn mib(bytes: usize) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{count_on, count_primes, share};
+    use crate::pool::Pool;
+    use crate::ticket::{MemoryStore, put};
+
+    #[test]
+    fn count_primes_finds_the_primes_up_to_30() {
+        let numbers: Vec<u64> = (1..=30).collect();
+        // 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+        assert_eq!(count_primes(&numbers), 10);
+    }
+
+    #[test]
+    fn the_shares_cover_every_number_once() {
+        let all: Vec<u64> = (1..=1000).collect();
+        for slips in [1, 7, 16, 64] {
+            let joined: Vec<u64> = (0..slips)
+                .flat_map(|n| share(&all, n, slips).to_vec())
+                .collect();
+            assert_eq!(joined, all, "cut into {slips} slips");
+        }
+    }
+
+    #[test]
+    fn the_job_on_a_crew_gives_the_same_answer_as_one_cook() {
+        let pass = MemoryStore::new();
+        let crew = Pool::start(4, &pass);
+        let all: Vec<u64> = (1..=10_000).collect();
+        let expected = count_primes(&all);
+        let numbers = put(&pass, all);
+        assert_eq!(count_on(&crew, &numbers, 16), expected);
+        assert_eq!(expected, 1229);
+    }
 }

@@ -4,7 +4,7 @@ Build a distributed compute engine — a nano-[Ray](https://github.com/ray-proje
 — from an empty folder to a fault-tolerant cluster, in Rust, one tested
 day at a time.
 
-**Status: being written — Days 0–3 are done** (read them in
+**Status: being written — Days 0–4 are done** (read them in
 [`book/src`](book/src/introduction.md)). This book and
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
 are two books of one series, written side by side. **Each book stands
@@ -150,7 +150,7 @@ actor, and node failures.
 
 ## The planned 18 days
 
-Days 0–3 are built; the rest is planned, and day boundaries will be
+Days 0–4 are built; the rest is planned, and day boundaries will be
 refined as the book is written. Same shape as the first course, with a slightly longer paid
 half: the subject is bigger. Days 0–5 free in this repository (a complete
 mini-Ray on one machine), days 6–17 in the Pro edition (the distributed
@@ -163,7 +163,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 1&nbsp;✅ | A function runs elsewhere | Wrap a plain function as a task, hand it to a worker, and hold a ticket for the answer. | 1.5–&#8288;2&nbsp;h |
 | 2&nbsp;✅ | Tickets you can pass around | Results live behind ids: get them, wait on them, and pass a ticket to the next task before the food is ready. | 2–&#8288;2.5&nbsp;h |
 | 3&nbsp;✅ | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2&nbsp;h |
-| 4 | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a quarter of its time, measured. | 2&nbsp;h |
+| 4&nbsp;✅ | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a bit more than a quarter of its time, measured. | 2&nbsp;h |
 | 5 | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2&nbsp;h |
 | 6 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2&nbsp;h |
 | 7 | Crossing the machine line | A worker on another machine runs your task over plain TCP — and everything built so far still works. | 2.5&nbsp;h |
