@@ -1,8 +1,11 @@
 use std::any::Any;
 use std::fmt;
 use std::panic::{self, AssertUnwindSafe};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
+use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
+
+use crate::ticket::{MemoryStore, ObjectId, Outcome, Ticket};
 
 /// A unit of work: any function the worker may call exactly once, safe to
 /// move to another thread.
@@ -15,6 +18,7 @@ pub type Job = Box<dyn FnOnce() + Send + 'static>;
 pub struct Worker {
     sender: Option<Sender<Job>>,
     handle: Option<JoinHandle<()>>,
+    store: Arc<MemoryStore>,
 }
 
 impl Worker {
@@ -33,12 +37,13 @@ impl Worker {
         Worker {
             sender: Some(sender),
             handle: Some(handle),
+            store: MemoryStore::new(),
         }
     }
 
     /// Queue `job` for the worker and return immediately. Fire and forget.
     pub fn execute(&self, job: Job) {
-        // If the worker is gone the job is dropped unrun (Ticket::get reports it).
+        // If the worker is gone the job is dropped unrun (its Promise reports it).
         let _ = self.sender.as_ref().expect("worker is running").send(job);
     }
 
@@ -46,19 +51,12 @@ impl Worker {
     pub fn submit<T, F>(&self, task: F) -> Ticket<T>
     where
         F: FnOnce() -> T + Send + 'static,
-        T: Send + 'static,
+        T: Send + Sync + 'static,
     {
-        let (result_sender, result_receiver) = mpsc::channel();
-        self.execute(Box::new(move || {
-            // A panic inside the task stops here instead of killing the worker.
-            let outcome =
-                panic::catch_unwind(AssertUnwindSafe(task)).map_err(TaskError::from_panic);
-            // The caller may have thrown the ticket away; nobody to tell.
-            let _ = result_sender.send(outcome);
-        }));
-        Ticket {
-            receiver: result_receiver,
-        }
+        let id = self.store.new_id();
+        let promise = Promise::new(id, Arc::clone(&self.store));
+        self.execute(Box::new(move || promise.keep(run_catching(task))));
+        Ticket::new(id, Arc::clone(&self.store))
     }
 }
 
@@ -72,30 +70,58 @@ impl Drop for Worker {
     }
 }
 
-/// Analogy: the numbered order ticket — proof you are owed a dish that may
-/// not be cooked yet.
-///
-/// The receiving end of a private one-result channel; `get` blocks until the
-/// task's result arrives.
-pub struct Ticket<T> {
-    receiver: Receiver<Result<T, TaskError>>,
+/// Run `task`, turning a panic into a `TaskError` instead of a dead thread.
+fn run_catching<T, F>(task: F) -> Outcome
+where
+    F: FnOnce() -> T,
+    T: Send + Sync + 'static,
+{
+    match panic::catch_unwind(AssertUnwindSafe(task)) {
+        Ok(value) => Ok(Arc::new(value)),
+        Err(payload) => Err(TaskError::from_panic(payload)),
+    }
 }
 
-impl<T> Ticket<T> {
-    /// Wait until the task finishes, then hand over its result.
-    pub fn get(self) -> Result<T, TaskError> {
-        match self.receiver.recv() {
-            Ok(outcome) => outcome,
-            // The job was dropped unrun, so its sender is gone.
-            Err(_) => Err(TaskError {
+/// Analogy: the cook's stub of the order slip — whatever happens to the
+/// order, something lands on the pass under that number.
+///
+/// The duty to store one task's outcome. If the job is thrown away unrun,
+/// `Drop` stores a "worker stopped" error, so no `get` waits forever.
+struct Promise {
+    id: ObjectId,
+    store: Arc<MemoryStore>,
+    kept: bool,
+}
+
+impl Promise {
+    fn new(id: ObjectId, store: Arc<MemoryStore>) -> Promise {
+        Promise {
+            id,
+            store,
+            kept: false,
+        }
+    }
+
+    /// Store the task's outcome under the promised id.
+    fn keep(mut self, outcome: Outcome) {
+        self.store.put(self.id, outcome);
+        self.kept = true;
+    }
+}
+
+impl Drop for Promise {
+    fn drop(&mut self) {
+        if !self.kept {
+            let error = TaskError {
                 message: "worker stopped before the task finished".to_string(),
-            }),
+            };
+            self.store.put(self.id, Err(error));
         }
     }
 }
 
 /// Why a task produced no result.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TaskError {
     message: String,
 }
@@ -123,7 +149,8 @@ impl fmt::Display for TaskError {
 
 #[cfg(test)]
 mod tests {
-    use super::Worker;
+    use super::{Promise, Worker};
+    use crate::ticket::{MemoryStore, Ticket};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
@@ -212,5 +239,27 @@ mod tests {
         let bad = worker.submit(|| -> u64 { panic!("boom") });
         assert!(bad.get().is_err());
         assert_eq!(worker.submit(|| 3 * 3).get().unwrap(), 9);
+    }
+
+    #[test]
+    fn a_burnt_dish_reads_the_same_through_every_copy() {
+        let worker = Worker::start("worker-0");
+        let burnt = worker.submit(|| -> u64 { panic!("the oven caught fire") });
+        let copy = burnt.clone();
+        let expected = "task failed: the oven caught fire";
+        assert_eq!(burnt.get().unwrap_err().to_string(), expected);
+        assert_eq!(copy.get().unwrap_err().to_string(), expected);
+    }
+
+    #[test]
+    fn a_job_thrown_away_unrun_reports_worker_stopped() {
+        let store = MemoryStore::new();
+        let id = store.new_id();
+        let ticket: Ticket<u64> = Ticket::new(id, Arc::clone(&store));
+        drop(Promise::new(id, store));
+        assert_eq!(
+            ticket.get().unwrap_err().to_string(),
+            "task failed: worker stopped before the task finished"
+        );
     }
 }
