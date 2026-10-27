@@ -1,7 +1,9 @@
 mod meter;
+mod pool;
 mod ticket;
 mod worker;
 
+use pool::Pool;
 use std::thread;
 use std::time::{Duration, Instant};
 use ticket::{MemoryStore, Ticket, put, wait};
@@ -25,6 +27,8 @@ fn main() {
     one_cook_copies_or_shares();
     two_cooks_one_pass();
     the_waiter_stocks_the_pantry();
+    picked_by_hand();
+    one_rail_for_the_crew();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -159,6 +163,71 @@ fn the_waiter_stocks_the_pantry() {
     println!("8 tasks on 2 cooks        -> {done} done: {}", cost(since));
     let seen = how_many_saw(&readers, home);
     println!("saw the delivery's bytes  -> {seen} of 8");
+}
+
+/// Tonight's four slips: one big one (800 ms of cooking), then three quick
+/// ones (200 ms each).
+const SLIPS_MS: [u64; 4] = [800, 200, 200, 200];
+
+/// Cook for `ms` milliseconds, then report who cooked and when, on `clock`,
+/// the slip was done.
+fn cook_for(ms: u64, clock: Instant) -> (String, Duration) {
+    thread::sleep(Duration::from_millis(ms));
+    (cook_name(), clock.elapsed())
+}
+
+/// Two cooks, each with a rail of their own; the waiter picks a cook for
+/// every slip, in turn.
+fn picked_by_hand() {
+    let pass = MemoryStore::new();
+    let cooks = [
+        Worker::start_in("worker-1", &pass),
+        Worker::start_in("worker-2", &pass),
+    ];
+    let clock = Instant::now();
+    let slips: Vec<Ticket<(String, Duration)>> = SLIPS_MS
+        .iter()
+        .enumerate()
+        .map(|(n, &ms)| cooks[n % 2].submit(move || cook_for(ms, clock)))
+        .collect();
+    report("picked by hand, 2 cooks", &slips);
+}
+
+/// When all four slips were done, then each cook's share of them: first the
+/// cook who got the big slip, then the other one.
+fn report(label: &str, slips: &[Ticket<(String, Duration)>]) {
+    let done: Vec<(String, Duration)> = slips
+        .iter()
+        .map(|slip| slip.get().expect("no slip burns"))
+        .collect();
+    let whole = done.iter().map(|(_, at)| *at).max().expect("4 slips");
+    println!(
+        "{label:<26}-> all 4 slips done after about {} ms",
+        round_to_100(whole)
+    );
+    // Split the slips in two: those the big slip's cook cooked, and the rest.
+    let (big, other): (Vec<_>, Vec<_>) = done.iter().partition(|(cook, _)| *cook == done[0].0);
+    for (who, theirs) in [("the big slip's cook", big), ("the other cook", other)] {
+        let last = theirs.iter().map(|(_, at)| *at).max().unwrap_or_default();
+        println!(
+            "  {who:<24}-> {} of 4 slips, done at about {} ms, then idle {} ms",
+            theirs.len(),
+            round_to_100(last),
+            round_to_100(whole - last)
+        );
+    }
+}
+
+/// The same four slips on a crew of two cooks sharing one rail.
+fn one_rail_for_the_crew() {
+    let pass = MemoryStore::new();
+    let crew = Pool::start(2, &pass);
+    let clock = Instant::now();
+    let slips: Vec<Ticket<(String, Duration)>> = SLIPS_MS
+        .iter()
+        .map(|&ms| crew.submit(move || cook_for(ms, clock)))
+        .collect();
+    report("one rail, a crew of 2", &slips);
 }
 
 /// The name of the thread running this code: inside a task, the cook's name.
