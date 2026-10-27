@@ -143,7 +143,7 @@ impl Drop for Worker {
 }
 
 /// Run `task`, turning a panic into a `TaskError` instead of a dead thread.
-fn run_catching<T, F>(task: F) -> Outcome
+pub(crate) fn run_catching<T, F>(task: F) -> Outcome
 where
     F: FnOnce() -> T,
     T: Send + Sync + 'static,
@@ -159,14 +159,14 @@ where
 ///
 /// The duty to store one task's outcome. If the job is thrown away unrun,
 /// `Drop` stores a "worker stopped" error, so no `get` waits forever.
-struct Promise {
+pub(crate) struct Promise {
     id: ObjectId,
     store: Arc<MemoryStore>,
     kept: bool,
 }
 
 impl Promise {
-    fn new(id: ObjectId, store: Arc<MemoryStore>) -> Promise {
+    pub(crate) fn new(id: ObjectId, store: Arc<MemoryStore>) -> Promise {
         Promise {
             id,
             store,
@@ -175,7 +175,7 @@ impl Promise {
     }
 
     /// Store the task's outcome under the promised id.
-    fn keep(mut self, outcome: Outcome) {
+    pub(crate) fn keep(mut self, outcome: Outcome) {
         self.store.put(self.id, outcome);
         self.kept = true;
     }

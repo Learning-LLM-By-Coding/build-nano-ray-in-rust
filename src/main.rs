@@ -1,10 +1,13 @@
+mod actor;
 mod meter;
 mod pool;
 mod ticket;
 mod worker;
 
+use actor::Actor;
 use pool::Pool;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use ticket::{MemoryStore, Ticket, put, wait};
@@ -32,6 +35,8 @@ fn main() {
     one_rail_for_the_crew();
     the_crew_and_the_pantry();
     more_cooks_less_time();
+    a_tab_on_the_crew();
+    a_bartender_keeps_the_tab();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -381,6 +386,101 @@ fn more_cooks_less_time() {
     println!(
         "a crew of 4, 64 slips     -> {primes} primes in {ms:.0} ms, {:.2}x as fast as 1 cook",
         alone_ms / ms
+    );
+}
+
+/// Table 4's evening: three drinks, each with its price in dollars and how
+/// long it takes to pour, in milliseconds. The guests ask for the cocktail
+/// first, the lemonade last.
+const DRINKS: [(&str, u64, u64); 3] = [
+    ("cocktail", 12, 300),
+    ("beer", 6, 200),
+    ("lemonade", 4, 100),
+];
+
+/// Analogy: the tabs — what each table owes so far, kept from one drink to
+/// the next.
+///
+/// A running total in dollars for every table with an open tab.
+#[derive(Default)]
+struct Tabs {
+    by_table: HashMap<u32, u64>,
+}
+
+impl Tabs {
+    /// Put `price` on `table`'s tab, opening it if needed; return the new total.
+    fn add(&mut self, table: u32, price: u64) -> u64 {
+        let tab = self.by_table.entry(table).or_default();
+        *tab += price;
+        *tab
+    }
+
+    /// Close `table`'s tab: return what it owes (nothing, if no tab is open).
+    fn close(&mut self, table: u32) -> u64 {
+        self.by_table.remove(&table).unwrap_or(0)
+    }
+}
+
+/// Wait for the evening's three drinks and the bill, then print the bill,
+/// when it was all over, and the tab as each drink left it.
+fn tell_the_evening(label: &str, steps: &[Ticket<u64>], clock: Instant) {
+    let seen: Vec<u64> = steps
+        .iter()
+        .map(|step| step.get().expect("no drink spills"))
+        .collect();
+    println!(
+        "{label:<26}-> the bill: ${}, after about {} ms",
+        seen[3],
+        round_to_100(clock.elapsed())
+    );
+    for ((drink, _, _), tab) in DRINKS.iter().zip(&seen) {
+        println!("  after the {drink:<14}-> table 4's tab: ${tab}");
+    }
+}
+
+/// Table 4's evening on a crew of four, the tabs behind one lock: each slip
+/// pours its drink and writes it on the tab; the last slip asks for the bill.
+fn a_tab_on_the_crew() {
+    let crew = Pool::start(4, &MemoryStore::new());
+    let tabs = Arc::new(Mutex::new(Tabs::default()));
+    let clock = Instant::now();
+    let mut slips: Vec<Ticket<u64>> = DRINKS
+        .iter()
+        .map(|&(_, price, ms)| {
+            let tabs = Arc::clone(&tabs);
+            crew.submit(move || {
+                thread::sleep(Duration::from_millis(ms));
+                tabs.lock().unwrap().add(4, price)
+            })
+        })
+        .collect();
+    let for_the_bill = Arc::clone(&tabs);
+    slips.push(crew.submit(move || for_the_bill.lock().unwrap().close(4)));
+    tell_the_evening("a crew, one locked tab", &slips, clock);
+    let left = tabs.lock().unwrap().close(4);
+    println!("  still on the tab        -> ${left}");
+}
+
+/// Table 4's evening with a bartender: an actor who owns the tabs and pours
+/// every drink, one call at a time.
+fn a_bartender_keeps_the_tab() {
+    let bartender = Actor::start("bartender", &MemoryStore::new(), Tabs::default());
+    let clock = Instant::now();
+    let mut calls: Vec<Ticket<u64>> = DRINKS
+        .iter()
+        .map(|&(_, price, ms)| {
+            bartender.call(move |tabs: &mut Tabs| {
+                thread::sleep(Duration::from_millis(ms));
+                tabs.add(4, price)
+            })
+        })
+        .collect();
+    calls.push(bartender.call(|tabs: &mut Tabs| tabs.close(4)));
+    tell_the_evening("a bartender, one tab", &calls, clock);
+    let left = bartender.call(|tabs: &mut Tabs| tabs.close(4));
+    println!(
+        "  still on the tab        -> ${}",
+        left.get().expect("no drink spills")
     );
 }
 
