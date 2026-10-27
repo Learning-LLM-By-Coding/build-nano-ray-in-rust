@@ -38,6 +38,7 @@ fn main() {
     a_tab_on_the_crew();
     a_bartender_keeps_the_tab();
     two_bartenders_one_pass();
+    the_crew_pours_the_bartender_writes();
 }
 
 /// One cook makes the stock; eight tasks need it.
@@ -536,6 +537,32 @@ fn two_bartenders_one_pass() {
     println!(
         "table 7's tab after that  -> ${}",
         owed.get().expect("reading a tab never burns")
+    );
+}
+
+/// Table 4's evening once more: the crew pours the drinks side by side, and
+/// the bartender writes each one on the tab, in the order the guests asked.
+fn the_crew_pours_the_bartender_writes() {
+    let pass = MemoryStore::new();
+    let crew = Pool::start(4, &pass);
+    let bartender = Actor::start("bartender", &pass, Tabs::default());
+    let clock = Instant::now();
+    let mut calls: Vec<Ticket<u64>> = DRINKS
+        .iter()
+        .map(|&(_, price, ms)| {
+            let drink = crew.submit(move || {
+                thread::sleep(Duration::from_millis(ms));
+                price
+            });
+            bartender.call_reading(&drink, |tabs: &mut Tabs, price: &u64| tabs.add(4, *price))
+        })
+        .collect();
+    calls.push(bartender.call(|tabs: &mut Tabs| tabs.close(4)));
+    tell_the_evening("the crew pours, one tab", &calls, clock);
+    let left = bartender.call(|tabs: &mut Tabs| tabs.close(4));
+    println!(
+        "  still on the tab        -> ${}",
+        left.get().expect("no drink spills")
     );
 }
 

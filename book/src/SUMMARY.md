@@ -10,3 +10,4 @@
 - [Day 2: Tickets you can pass around](day-02-tickets-you-can-pass-around.md)
 - [Day 3: The object store](day-03-the-object-store.md)
 - [Day 4: Many workers, one scheduler](day-04-many-workers-one-scheduler.md)
+- [Day 5: Actors — workers with memory](day-05-actors-workers-with-memory.md)

@@ -32,6 +32,7 @@ introduced it, if you want the full explanation again.
 | 2 | [The pass gets numbered spots](#day-2--the-pass-gets-numbered-spots) | ticket number, the pass, the cook's stub, wait, held slip, error propagation |
 | 3 | [The pantry](#day-3--the-pantry) | the meter, the pantry, reading in place, one pass for the whole kitchen, put, sealed |
 | 4 | [The crew](#day-4--the-crew) | the crew, one rail for the whole crew, anyone who takes slips, speedup, slip size |
+| 5 | [The bar](#day-5--the-bar) | a lock keeps writes, not order; the bartender; the bartender's rail; a call; two bartenders; the slipped glass; a call that waits in line |
 
 ## Day 1 — one cook
 
@@ -295,5 +296,92 @@ cook busy to the end.
 *What it is:* how much of a job one task carries: split the job into more tasks, and each one is smaller. Too few, unequal tasks leave workers idle while the last big one finishes; too many tiny tasks spend their time on per-task overhead. Ray's tips for first-time users warn against tiny tasks for that reason.
 
 *In the story:* cut a big order into a few large slips, and three cooks may wait for the fourth; cut it into crumbs, and the cooks spend the evening walking to the rail.
+
+</div>
+
+## Day 5 — the bar
+
+A guest at the bar runs a **tab**, and a tab has to last from one drink
+to the next — something no slip can do. The crew tries keeping one tab
+book behind a lock: every drink gets written, but the bill, which takes
+no time to pour, is written first and comes out empty. So the restaurant
+hires a **bartender**: a worker with a memory — the tabs — and a rail of
+their own. Nobody else touches the tabs; you pin a call to the
+bartender's rail, get a ticket on the spot, and the bartender takes the
+calls one at a time, in the order they were pinned. Two bartenders never
+wait for each other, and cooks read their answers off the pass like any
+dish. When a glass slips, a note comes back, the bartender stays on
+shift, and whatever was already written on the tab stays written. Last,
+the crew pours the drinks side by side while the bartender writes each
+one down, in the order the guests asked — waiting at a call whose drink
+isn't up yet, with every later call waiting behind it.
+
+<div class="concept" id="one-lock">
+
+**A lock keeps writes, not order** · [Day 5, section A](day-05-actors-workers-with-memory.md)
+
+*What it is:* state shared by many tasks behind a lock (`Arc<Mutex<…>>`). The lock makes sure no two tasks change it at the same moment, so no change is lost; it does nothing about *which* task gets there first. On a pool, a quick task overtakes a slow one, so changes land in the order tasks finish, not the order they were sent. In Ray the tasks are separate processes and could not even share the lock; Ray's docs say to put such state in an actor instead.
+
+*In the story:* one tab book for the whole crew. The cooks take turns writing in it, and every drink gets written — but the bill, which takes no time to pour, gets written first.
+
+</div>
+
+<div class="concept" id="actor">
+
+**Actor — the bartender** · [Day 5, section A](day-05-actors-workers-with-memory.md)
+
+*What it is:* a dedicated thread (`Actor<S>`) that owns a value of type `S` — the actor's state — and runs the calls sent to it, one at a time, on that thread. The state moves in when the actor starts and never comes out, so it needs no lock. Ray's actors are the same idea: `@ray.remote` on a class, one dedicated worker process per instance.
+
+*In the story:* the bartender. Like a cook, the bartender works through what is pinned to their rail. Unlike a cook, they keep things behind the bar — today, the tabs. Nobody else reaches over the bar.
+
+</div>
+
+<div class="concept" id="mailbox">
+
+**Mailbox — the bartender's rail** · [Day 5, section A](day-05-actors-workers-with-memory.md)
+
+*What it is:* the actor's own channel of calls. The actor takes them strictly one at a time, oldest first, so the order calls were sent in is the order they run in — the actor's one promise. Ray keeps the same promise for the calls from one submitter.
+
+*In the story:* the bartender's own rail. Calls are pinned to it in order, and the bartender never skips ahead.
+
+</div>
+
+<div class="concept" id="actor-call">
+
+**A call — a slip for the bartender** · [Day 5, section A](day-05-actors-workers-with-memory.md)
+
+*What it is:* `actor.call(|state| …)` sends a function that takes the actor's state (`&mut S`) and returns a ticket at once; the answer lands on the same pass as every task's result. It is our version of Ray's `actor.method.remote(…)`.
+
+*In the story:* a slip pinned to the bartender's rail — "put a beer on table 4" — with a ticket for the answer, which comes out on the pass like any dish.
+
+</div>
+
+<div class="concept" id="two-actors">
+
+**Many actors, one pass** · [Day 5, section B](day-05-actors-workers-with-memory.md)
+
+*What it is:* every actor has its own thread, state, and mailbox, so actors never wait for each other. Their tickets share the store, and its numbering, with tasks and `put` values, so a task can read an actor's result and an actor can read a task's. In Ray, actor results are objects like any other.
+
+*In the story:* two bartenders, each with their own tabs and rail. One pours a slow cocktail while the other serves a beer at once, and a cook splits a bill straight off the pass.
+
+</div>
+
+<div class="concept" id="actor-error">
+
+**A failed call — the slipped glass** · [Day 5, section B](day-05-actors-workers-with-memory.md)
+
+*What it is:* a call that panics becomes a task error on its own ticket, and the actor carries on with the next call. Nothing is rolled back: whatever the call changed before the panic stays changed, so calls should check first and change last. Ray behaves the same for an exception in an actor method; an actor whose process dies is Day 13's subject.
+
+*In the story:* the bartender puts a beer on the tab, then drops the glass. A note goes out instead of the beer, the bartender stays on shift — and the beer stays on the tab.
+
+</div>
+
+<div class="concept" id="held-call">
+
+**A call that waits in line** · [Day 5, section C](day-05-actors-workers-with-memory.md)
+
+*What it is:* `actor.call_reading(&ticket, |state, value| …)` joins the mailbox at once. When its turn comes, the actor waits for the ticket's result to land, then reads it in place; every later call waits too, so the order holds. If the input failed, the call never runs and its ticket carries the same error. Unlike a held slip, it never steps aside — stepping aside would let later calls overtake it.
+
+*In the story:* "when the cocktail is up, put it on table 4's tab." The bartender reaches that call and waits for the cocktail; the calls behind it wait too, so the drinks go on the tab in the order the guests asked.
 
 </div>

@@ -1836,7 +1836,7 @@ slip size by hand; and a cook whose job crashes outside `submit` (a raw
 interchangeable — any slip, any cook — so nothing one slip leaves behind
 is there for the next. That is exactly what makes the crew fast, and
 exactly what some work cannot live with: a counter, a cache, a model
-loaded once and used a thousand times. On Day 5 a cook gets a memory and
-a mailbox of their own — an **actor** — and a rail of one's own comes
-back, this time on purpose. Tonight the kitchen closes with a crew on one
+loaded once and used a thousand times. Next, a worker gets a memory
+— on Day 5, behind the bar: an **actor**, with a rail of its own, this
+time on purpose. Tonight the kitchen closes with a crew on one
 rail, one pass, and one pantry — see [the restaurant](story.md).

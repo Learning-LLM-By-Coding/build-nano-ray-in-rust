@@ -58,6 +58,31 @@ impl<S: Send + 'static> Actor<S> {
         Ticket::new(id, Arc::clone(&self.store))
     }
 
+    /// Like `call`, but `method` also reads the result behind `input`, in
+    /// place. The call joins the mailbox at once. When its turn comes, the
+    /// actor waits there for `input` to land, and every later call waits with
+    /// it — so calls still run in the order they were sent. If `input` failed,
+    /// `method` never runs and its ticket carries the same error.
+    pub fn call_reading<A, T, F>(&self, input: &Ticket<A>, method: F) -> Ticket<T>
+    where
+        A: Send + Sync + 'static,
+        F: FnOnce(&mut S, &A) -> T + Send + 'static,
+        T: Send + Sync + 'static,
+    {
+        let id = self.store.new_id();
+        let promise = Promise::new(id, Arc::clone(&self.store));
+        let input_copy = input.clone();
+        self.send(Box::new(move |state: &mut S| {
+            // Blocks until the input lands, holding up the calls behind this one.
+            let outcome = match input_copy.read() {
+                Ok(value) => run_catching(|| method(state, &value)),
+                Err(error) => Err(error),
+            };
+            promise.keep(outcome);
+        }));
+        Ticket::new(id, Arc::clone(&self.store))
+    }
+
     /// Put `message` in the mailbox, behind every call already waiting there.
     fn send(&self, message: Message<S>) {
         // If the actor is gone the call is dropped unrun (its Promise reports it).
@@ -226,5 +251,63 @@ mod tests {
         assert!(burnt.get().is_err());
         // Nothing rolls back: the change made before the panic stays.
         assert_eq!(counter.call(|count: &mut u64| *count).get().unwrap(), 1);
+    }
+
+    #[test]
+    fn calls_reading_tickets_still_run_in_the_order_sent() {
+        let store = MemoryStore::new();
+        let crew = Pool::start(2, &store);
+        let log = Actor::start("logger", &store, Vec::<String>::new());
+        let (open_first, first_gate) = mpsc::channel::<()>();
+        let (open_second, second_gate) = mpsc::channel::<()>();
+        let first = crew.submit(move || {
+            first_gate.recv().unwrap();
+            "first".to_string()
+        });
+        let second = crew.submit(move || {
+            second_gate.recv().unwrap();
+            "second".to_string()
+        });
+        for input in [&first, &second] {
+            log.call_reading(input, |lines: &mut Vec<String>, dish: &String| {
+                lines.push(dish.clone())
+            });
+        }
+        log.call(|lines: &mut Vec<String>| lines.push("later".to_string()));
+        // The second input lands first, then the first one.
+        open_second.send(()).unwrap();
+        second.get().unwrap();
+        open_first.send(()).unwrap();
+        let lines = log.call(|lines: &mut Vec<String>| lines.clone());
+        assert_eq!(lines.get().unwrap(), ["first", "second", "later"]);
+    }
+
+    #[test]
+    fn an_actors_own_ticket_can_feed_its_next_call() {
+        let counter = Actor::start("counter", &MemoryStore::new(), 1_u64);
+        let first = counter.call(|count: &mut u64| {
+            *count *= 10;
+            *count
+        });
+        let next = counter.call_reading(&first, |count: &mut u64, seen: &u64| *count + seen);
+        assert_eq!(next.get().unwrap(), 20);
+    }
+
+    #[test]
+    fn a_failed_input_skips_the_call_and_passes_the_error_on() {
+        let store = MemoryStore::new();
+        let crew = Pool::start(1, &store);
+        let counter = Actor::start("counter", &store, 0_u64);
+        let burnt = crew.submit(|| -> u64 { panic!("the oven caught fire") });
+        let skipped = counter.call_reading(&burnt, |count: &mut u64, price: &u64| {
+            *count += price;
+            *count
+        });
+        assert_eq!(
+            skipped.get().unwrap_err().to_string(),
+            "task failed: the oven caught fire"
+        );
+        let count = counter.call(|count: &mut u64| *count);
+        assert_eq!(count.get().unwrap(), 0, "the skipped call never ran");
     }
 }
