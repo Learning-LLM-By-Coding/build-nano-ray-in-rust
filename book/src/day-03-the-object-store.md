@@ -1848,7 +1848,7 @@ behind its own cook's queue even when the other cook is idle.
 you choosing the cook for every slip. On Day 4 the kitchen gets a pool of
 cooks behind **one** queue, and a scheduler that hands each slip to
 whichever cook is free — and you will measure a slow job dropping to a
-quarter of its time. Today's pantry is what lets all those cooks share
+bit more than a quarter of its time. Today's pantry is what lets all those cooks share
 their inputs without copying them. Tonight the kitchen closes with one
 pass, one pantry, and a waiter who can stock it — see
 [the restaurant](story.md).
