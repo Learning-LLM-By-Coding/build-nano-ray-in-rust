@@ -58,6 +58,35 @@ impl Worker {
         self.execute(Box::new(move || promise.keep(run_catching(task))));
         Ticket::new(id, Arc::clone(&self.store))
     }
+
+    /// Like `submit`, but `task` takes the result behind `input` as its
+    /// argument. Returns a ticket at once; the task joins the queue only
+    /// once `input` has landed. If `input` failed, `task` never runs and its
+    /// ticket carries the same error.
+    pub fn submit_with<A, T, F>(&self, input: &Ticket<A>, task: F) -> Ticket<T>
+    where
+        A: Clone + Send + Sync + 'static,
+        F: FnOnce(A) -> T + Send + 'static,
+        T: Send + Sync + 'static,
+    {
+        let id = self.store.new_id();
+        let promise = Promise::new(id, Arc::clone(&self.store));
+        let input_copy = input.clone();
+        let job: Job = Box::new(move || {
+            // Already landed by the time this job runs, so `get` won't block.
+            let outcome = match input_copy.get() {
+                Ok(value) => run_catching(move || task(value)),
+                Err(error) => Err(error),
+            };
+            promise.keep(outcome);
+        });
+        let sender = self.sender.clone().expect("worker is running");
+        input.when_ready(Box::new(move || {
+            // As in `execute`: a job sent to a stopped worker is dropped unrun.
+            let _ = sender.send(job);
+        }));
+        Ticket::new(id, Arc::clone(&self.store))
+    }
 }
 
 impl Drop for Worker {
@@ -261,5 +290,86 @@ mod tests {
             ticket.get().unwrap_err().to_string(),
             "task failed: worker stopped before the task finished"
         );
+    }
+
+    #[test]
+    fn submit_with_returns_before_its_input_is_ready() {
+        let worker = Worker::start("worker-0");
+        let (open_gate, gate) = mpsc::channel::<()>();
+        let first = worker.submit(move || {
+            gate.recv().unwrap();
+            20_u64
+        });
+        // The input cannot be ready (the gate is shut), yet we get a ticket.
+        let second = worker.submit_with(&first, |x| x + 1);
+        open_gate.send(()).unwrap();
+        assert_eq!(second.get().unwrap(), 21);
+    }
+
+    #[test]
+    fn one_ticket_can_feed_several_tasks_and_chains() {
+        let worker = Worker::start("worker-0");
+        let base = worker.submit(|| 3_u64);
+        let plus_one = worker.submit_with(&base, |x| x + 1);
+        let doubled = worker.submit_with(&plus_one, |x| x * 2);
+        let times_ten = worker.submit_with(&base, |x| x * 10);
+        assert_eq!(doubled.get().unwrap(), 8);
+        assert_eq!(times_ten.get().unwrap(), 30);
+        assert_eq!(base.get().unwrap(), 3);
+    }
+
+    #[test]
+    fn a_held_task_joins_the_queue_when_its_input_lands() {
+        let worker = Worker::start("worker-0");
+        let order = Arc::new(Mutex::new(Vec::new()));
+        let (open_gate, gate) = mpsc::channel::<()>();
+        let log = Arc::clone(&order);
+        let first = worker.submit(move || {
+            gate.recv().unwrap();
+            log.lock().unwrap().push("first");
+        });
+        let log = Arc::clone(&order);
+        let held = worker.submit_with(&first, move |()| log.lock().unwrap().push("held"));
+        let log = Arc::clone(&order);
+        let later = worker.submit(move || log.lock().unwrap().push("later"));
+        open_gate.send(()).unwrap();
+        held.get().unwrap();
+        later.get().unwrap();
+        // "later" was submitted after "held" but queued first: "held" waited
+        // off the queue until "first" landed.
+        assert_eq!(*order.lock().unwrap(), ["first", "later", "held"]);
+    }
+
+    #[test]
+    fn a_failed_input_skips_the_task_and_passes_the_error_on() {
+        let worker = Worker::start("worker-0");
+        let ran = Arc::new(AtomicBool::new(false));
+        let burnt = worker.submit(|| -> u64 { panic!("the oven caught fire") });
+        let flag = Arc::clone(&ran);
+        let next = worker.submit_with(&burnt, move |x| {
+            flag.store(true, Ordering::SeqCst);
+            x + 1
+        });
+        let after_that = worker.submit_with(&next, |x| x * 2);
+        assert_eq!(
+            after_that.get().unwrap_err().to_string(),
+            "task failed: the oven caught fire"
+        );
+        assert!(
+            !ran.load(Ordering::SeqCst),
+            "the task after a burnt input never runs"
+        );
+    }
+
+    #[test]
+    fn a_panic_in_the_second_task_stays_on_its_own_ticket() {
+        let worker = Worker::start("worker-0");
+        let base = worker.submit(|| 7_u64);
+        let bad = worker.submit_with(&base, |x| -> u64 { panic!("table {x} sent it back") });
+        assert_eq!(
+            bad.get().unwrap_err().to_string(),
+            "task failed: table 7 sent it back"
+        );
+        assert_eq!(base.get().unwrap(), 7);
     }
 }

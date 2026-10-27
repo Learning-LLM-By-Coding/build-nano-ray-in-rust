@@ -7,3 +7,4 @@
 # Part 1 — A mini-Ray on one machine (Days 1–5)
 
 - [Day 1: A function runs elsewhere](day-01-a-function-runs-elsewhere.md)
+- [Day 2: Tickets you can pass around](day-02-tickets-you-can-pass-around.md)

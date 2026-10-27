@@ -4,7 +4,7 @@ Build a distributed compute engine — a nano-[Ray](https://github.com/ray-proje
 — from an empty folder to a fault-tolerant cluster, in Rust, one tested
 day at a time.
 
-**Status: being written — Days 0–1 are done** (read them in
+**Status: being written — Days 0–2 are done** (read them in
 [`book/src`](book/src/introduction.md)). This book and
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
 are two books of one series, written side by side. **Each book stands
@@ -150,7 +150,7 @@ actor, and node failures.
 
 ## The planned 18 days
 
-Days 0–1 are built; the rest is planned, and day boundaries will be
+Days 0–2 are built; the rest is planned, and day boundaries will be
 refined as the book is written. Same shape as the first course, with a slightly longer paid
 half: the subject is bigger. Days 0–5 free in this repository (a complete
 mini-Ray on one machine), days 6–17 in the Pro edition (the distributed
@@ -159,9 +159,9 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 
 | Day | Theme | In plain words | ≈&nbsp;Time |
 |-----|-------|----------------|--------|
-| 0 | Setup: toolchain and the empty tested scaffold | Install the tools and end with a tested, running (if empty) program. | 0.5&nbsp;h |
-| 1 | A function runs elsewhere | Wrap a plain function as a task, hand it to a worker, and hold a ticket for the answer. | 1.5–&#8288;2&nbsp;h |
-| 2 | Tickets you can pass around | Results live behind ids: get them, wait on them, and pass a ticket to the next task before the food is ready. | 1.5–&#8288;2&nbsp;h |
+| 0&nbsp;✅ | Setup: toolchain and the empty tested scaffold | Install the tools and end with a tested, running (if empty) program. | 0.5&nbsp;h |
+| 1&nbsp;✅ | A function runs elsewhere | Wrap a plain function as a task, hand it to a worker, and hold a ticket for the answer. | 1.5–&#8288;2&nbsp;h |
+| 2&nbsp;✅ | Tickets you can pass around | Results live behind ids: get them, wait on them, and pass a ticket to the next task before the food is ready. | 2–&#8288;2.5&nbsp;h |
 | 3 | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2&nbsp;h |
 | 4 | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a quarter of its time, measured. | 2&nbsp;h |
 | 5 | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2&nbsp;h |

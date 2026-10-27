@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::worker::TaskError;
+use crate::worker::{Job, TaskError};
 
 /// Analogy: the number printed on an order ticket.
 ///
@@ -23,13 +23,23 @@ impl fmt::Display for ObjectId {
 /// What a finished task left behind: its value (type hidden), or why it failed.
 pub type Outcome = Result<Arc<dyn Any + Send + Sync>, TaskError>;
 
+/// Analogy: one numbered spot on the pass — either the dish is there, or
+/// order slips are clipped to the empty spot, waiting for it.
+///
+/// The store's entry for one id: its outcome, or the jobs to release the
+/// moment that outcome lands.
+enum Slot {
+    Ready(Outcome),
+    Waiting(Vec<Job>),
+}
+
 /// Analogy: the pass — the counter where finished dishes wait under their
 /// ticket numbers until someone collects them.
 ///
 /// A shared table from object id to outcome. A condition variable wakes
 /// every waiting thread whenever a new outcome lands.
 pub struct MemoryStore {
-    results: Mutex<HashMap<ObjectId, Outcome>>,
+    results: Mutex<HashMap<ObjectId, Slot>>,
     landed: Condvar,
     next_id: AtomicU64,
 }
@@ -49,17 +59,43 @@ impl MemoryStore {
         ObjectId(self.next_id.fetch_add(1, Ordering::Relaxed))
     }
 
-    /// Record the outcome for `id` and wake everyone waiting.
+    /// Record the outcome for `id`, wake everyone waiting, and release the
+    /// jobs that were held for it.
     pub fn put(&self, id: ObjectId, outcome: Outcome) {
-        self.results.lock().unwrap().insert(id, outcome);
+        let before = self
+            .results
+            .lock()
+            .unwrap()
+            .insert(id, Slot::Ready(outcome));
         self.landed.notify_all();
+        // The lock is already released here, so a released job may use the store.
+        if let Some(Slot::Waiting(held)) = before {
+            for job in held {
+                job();
+            }
+        }
+    }
+
+    /// Run `job` once `id` has an outcome: now, if it already has one;
+    /// otherwise later, from inside the `put` that stores it.
+    pub fn when_ready(&self, id: ObjectId, job: Job) {
+        let mut results = self.results.lock().unwrap();
+        let slot = results
+            .entry(id)
+            .or_insert_with(|| Slot::Waiting(Vec::new()));
+        if let Slot::Waiting(held) = slot {
+            held.push(job);
+            return;
+        }
+        drop(results);
+        job();
     }
 
     /// Block until `id` has an outcome, then return a copy of it.
     pub fn get(&self, id: ObjectId) -> Outcome {
         let mut results = self.results.lock().unwrap();
         loop {
-            if let Some(outcome) = results.get(&id) {
+            if let Some(Slot::Ready(outcome)) = results.get(&id) {
                 return outcome.clone();
             }
             // Releases the lock while asleep; re-takes it before returning.
@@ -73,7 +109,10 @@ impl MemoryStore {
         let deadline = Instant::now() + timeout;
         let mut results = self.results.lock().unwrap();
         loop {
-            let ready: Vec<bool> = ids.iter().map(|id| results.contains_key(id)).collect();
+            let ready: Vec<bool> = ids
+                .iter()
+                .map(|id| matches!(results.get(id), Some(Slot::Ready(_))))
+                .collect();
             let count = ready.iter().filter(|&&is_ready| is_ready).count();
             let now = Instant::now();
             if count >= num_ready || now >= deadline {
@@ -110,6 +149,11 @@ impl<T> Ticket<T> {
     /// The ticket's number.
     pub fn id(&self) -> ObjectId {
         self.id
+    }
+
+    /// Run `job` once this ticket's result (or error) has landed.
+    pub fn when_ready(&self, job: Job) {
+        self.store.when_ready(self.id, job);
     }
 }
 
@@ -161,7 +205,7 @@ pub fn wait<T>(
 mod tests {
     use super::{MemoryStore, Outcome, Ticket, wait};
     use crate::worker::Worker;
-    use std::sync::Arc;
+    use std::sync::{Arc, mpsc};
     use std::thread;
     use std::time::{Duration, Instant};
 
@@ -267,5 +311,26 @@ mod tests {
     fn wait_on_no_tickets_returns_at_once() {
         let (ready_now, pending) = wait(Vec::<Ticket<u64>>::new(), 1, Duration::from_secs(60));
         assert!(ready_now.is_empty() && pending.is_empty());
+    }
+
+    #[test]
+    fn when_ready_holds_a_job_until_the_result_lands() {
+        let store = MemoryStore::new();
+        let id = store.new_id();
+        let (tell, heard) = mpsc::channel();
+        store.when_ready(id, Box::new(move || tell.send("released").unwrap()));
+        assert!(heard.try_recv().is_err(), "held while nothing has landed");
+        store.put(id, ready(1));
+        assert_eq!(heard.try_recv(), Ok("released"));
+    }
+
+    #[test]
+    fn when_ready_runs_at_once_if_the_result_is_already_there() {
+        let store = MemoryStore::new();
+        let id = store.new_id();
+        store.put(id, ready(1));
+        let (tell, heard) = mpsc::channel();
+        store.when_ready(id, Box::new(move || tell.send("ran").unwrap()));
+        assert_eq!(heard.try_recv(), Ok("ran"));
     }
 }

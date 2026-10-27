@@ -12,6 +12,23 @@ fn slow_square(x: u64) -> u64 {
     x * x
 }
 
+/// Plain one-argument functions, ready to be fed another task's result.
+/// They print so you can see when, and whether, the cook runs them.
+fn add_one(x: u64) -> u64 {
+    println!("    cook: add_one({x}) = {}", x + 1);
+    x + 1
+}
+
+fn double(x: u64) -> u64 {
+    println!("    cook: double({x}) = {}", x * 2);
+    x * 2
+}
+
+fn times_ten(x: u64) -> u64 {
+    println!("    cook: times_ten({x}) = {}", x * 10);
+    x * 10
+}
+
 /// A slow task that always fails: the dish burns after 300 ms on the stove.
 fn slow_burn() -> u64 {
     thread::sleep(Duration::from_millis(300));
@@ -66,6 +83,47 @@ fn main() {
         "wait on the burnt one -> ready {} (a failure counts as done)",
         numbers(&ready)
     );
+
+    let base = worker.submit(|| slow_square(3));
+    println!("submit slow_square(3) -> ticket {}", base.id());
+    let plus_one = worker.submit_with(&base, add_one);
+    println!(
+        "submit add_one({})    -> ticket {}",
+        base.id(),
+        plus_one.id()
+    );
+    let doubled = worker.submit_with(&plus_one, double);
+    println!(
+        "submit double({})     -> ticket {}",
+        plus_one.id(),
+        doubled.id()
+    );
+    let tenfold = worker.submit_with(&base, times_ten);
+    println!(
+        "submit times_ten({})  -> ticket {}",
+        base.id(),
+        tenfold.id()
+    );
+    let (ready, _) = wait(vec![base.clone()], 1, Duration::ZERO);
+    println!("is {} ready yet?      -> {}", base.id(), !ready.is_empty());
+
+    let answer = doubled.get().expect("nothing burns here");
+    println!("get ticket {}         -> {answer}", doubled.id());
+    let answer = tenfold.get().expect("nothing burns here");
+    println!("get ticket {}         -> {answer}", tenfold.id());
+
+    let ruined = worker.submit(slow_burn);
+    println!("submit slow_burn      -> ticket {}", ruined.id());
+    let rescue = worker.submit_with(&ruined, add_one);
+    println!(
+        "submit add_one({})   -> ticket {}",
+        ruined.id(),
+        rescue.id()
+    );
+    match rescue.get() {
+        Ok(value) => println!("unexpected success: {value}"),
+        Err(error) => println!("get ticket {}        -> error: {error}", rescue.id()),
+    }
 }
 
 /// Print one `wait` step: which tickets are ready, and when that was.

@@ -29,6 +29,7 @@ introduced it, if you want the full explanation again.
 | Day | Scene | Concepts it adds |
 |-----|-------|------------------|
 | 1 | [One cook](#day-1--one-cook) | worker, task, ticket, get, task error |
+| 2 | [The pass gets numbered spots](#day-2--the-pass-gets-numbered-spots) | ticket number, the pass, the cook's stub, wait, held slip, error propagation |
 
 ## Day 1 — one cook
 
@@ -85,6 +86,77 @@ the next slip.
 *What it is:* when a task crashes, the crash is caught on the worker and delivered to the task's ticket as an error, and the worker carries on. Ray reports this as a `RayTaskError`.
 
 *In the story:* a dish burns, so the kitchen sends a note to the pass instead of the dish — “sorry, the oven caught fire” — and the cook picks up the next slip.
+
+</div>
+
+## Day 2 — the pass gets numbered spots
+
+Finished dishes stop travelling in private envelopes. They land on **the
+pass** under their ticket numbers and stay there, so a ticket becomes just
+a number: it can be photocopied, read twice, and handed to someone else.
+A bell rings each time a dish lands. The waiter learns to glance at the
+pass with a time limit and take whichever dishes are up. And an order that
+needs another dish — pasta that needs the sauce — is clipped to the sauce's
+empty spot, and goes to the cook only once the sauce lands. If the sauce
+burned, the pasta is never cooked; its spot gets a copy of the note.
+
+<div class="concept" id="ticket-number">
+
+**Ticket number — an id for a result** · [Day 2, section A](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* a small, copyable id (`ObjectId`) naming one task's result, whether or not the result exists yet. A ticket is now that id plus a pointer to the store where the result will land, so copying a ticket copies the claim, never the result. Ray's `ObjectRef` is the same idea.
+
+*In the story:* the number printed on the order ticket. Anyone holding a photocopy of the number can collect the same dish.
+
+</div>
+
+<div class="concept" id="the-pass">
+
+**The pass — where results wait** · [Day 2, section A](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* a table shared by every thread (`MemoryStore`), from ticket number to the task's outcome — its value or its error. A lock makes threads take turns at it, and a condition variable wakes everyone waiting whenever a new outcome lands. Reading a result leaves it in place. Ray's version is the in-process memory store.
+
+*In the story:* the counter where finished dishes come out, now with a numbered spot per ticket, and a bell the cook rings each time a dish lands.
+
+</div>
+
+<div class="concept" id="stub">
+
+**The cook's stub — a guarantee that something will land** · [Day 2, section A](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* the duty to store one task's outcome (`Promise`). It is kept when the task finishes or fails; if the job is thrown away unrun, dropping the promise stores a "worker stopped" error instead, so no reader ever waits forever.
+
+*In the story:* the stub the cook keeps when a slip goes on the rail. Whatever happens to the order, something ends up on the pass under that number.
+
+</div>
+
+<div class="concept" id="wait">
+
+**wait — a glance at the pass, with a time limit** · [Day 2, section B](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* blocks until at least a given number of tickets have results — a failure counts — or a timeout passes, then splits the tickets into `(ready, pending)`, in their original order. Ray's version is `ray.wait`.
+
+*In the story:* the waiter holding several tickets stands at the pass for at most a few seconds and leaves with whichever dishes are up.
+
+</div>
+
+<div class="concept" id="held-slip">
+
+**Held slip — a task whose input is another ticket** · [Day 2, section C](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* `submit_with(&ticket, task)` returns a new ticket at once, but the task joins the worker's queue only when the input ticket's result lands; the task then receives the plain value. In Ray, passing an `ObjectRef` as a task argument does the same.
+
+*In the story:* the pasta slip, clipped to the empty spot where the sauce will land. When the sauce lands, the cook unclips the slip and pins it to the rail.
+
+</div>
+
+<div class="concept" id="error-propagation">
+
+**Error propagation — the note travels down the chain** · [Day 2, section C](day-02-tickets-you-can-pass-around.md)
+
+*What it is:* if a held task's input failed, the task never runs, and its ticket carries the input's error, message intact — through any number of steps. Ray raises the original task's error at `ray.get` of any task downstream of it.
+
+*In the story:* the sauce burned, so the pasta is never cooked: the burnt-dish note is copied onto the pasta's spot on the pass.
 
 </div>
 
