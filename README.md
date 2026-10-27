@@ -172,7 +172,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 10&nbsp;✅&#8288;🔒 | Who owns what | Ray's hardest question: when is an object safe to delete? The program that ordered it counts every reference — tasks in flight included — and frees it with the last one; when that program leaves, its objects go with it. | 2.5&nbsp;h |
 | 11&nbsp;✅&#8288;🔒 | Scheduling with taste | Place tasks where their inputs already live; push work away when a node is busy — and measure what moving the data costs. | 2&nbsp;h |
 | 12&nbsp;✅&#8288;🔒 | When a worker dies | Kill a worker mid-task and watch the answer still arrive: lineage re-execution. | 2.5&nbsp;h |
-| 13&nbsp;🔒 | When an actor dies | Restart policies, replayed mailboxes, and what "exactly once" really costs. | 2&nbsp;h |
+| 13&nbsp;✅&#8288;🔒 | When an actor dies | An actor lives on a worker, and the head node's address book records which one; kill that worker and meet restart policies, replayed mailboxes, and what "exactly once" really costs. | 2.5&nbsp;h |
 | 14&nbsp;🔒 | When a whole node dies | Lost objects get rebuilt from their history; the cluster shrinks and keeps serving. | 2.5&nbsp;h |
 | 15&nbsp;🔒 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2&nbsp;h |
 | 16&nbsp;🔒 | Resources and placement | Tasks declare what they need — CPU slots, GPU slots — and the scheduler honors the budget. | 2&nbsp;h |
