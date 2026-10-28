@@ -161,7 +161,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 0&nbsp;✅ | Setup: toolchain and the empty tested scaffold | Install the tools and end with a tested, running (if empty) program. | 0.5&nbsp;h |
 | 1&nbsp;✅ | A function runs elsewhere | Wrap a plain function as a task, hand it to a worker, and hold a ticket for the answer. | 1.5–&#8288;2&nbsp;h |
 | 2&nbsp;✅ | Tickets you can pass around | Results live behind ids: get them, wait on them, and pass a ticket to the next task before the food is ready. | 2–&#8288;2.5&nbsp;h |
-| 3&nbsp;✅ | The object store | One shared pantry per machine: put bytes in once, every worker reads them without copying. | 2&nbsp;h |
+| 3&nbsp;✅ | The object store | One shared pantry per machine: put results in once, every worker reads them without copying. | 2&nbsp;h |
 | 4&nbsp;✅ | Many workers, one scheduler | A pool of workers and a queue of tasks — watch a slow job drop to a bit more than a quarter of its time, measured. | 2&nbsp;h |
 | 5&nbsp;✅ | Actors: workers with memory | Some work needs state. An actor is a worker that remembers, with a mailbox of ordered messages. | 2&nbsp;h |
 | 6&nbsp;✅&#8288;🔒 | Speaking across the wire | Task calls and results become bytes and come back whole — serialization, the border crossing every distributed system lives at. | 2.5&nbsp;h |

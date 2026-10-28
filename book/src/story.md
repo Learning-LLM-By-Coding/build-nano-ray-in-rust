@@ -37,7 +37,7 @@ introduced it, if you want the full explanation again.
 ## Day 1 — one cook
 
 The chain starts as one kitchen with **a single cook**. The waiter — your
-program — never cooks: they pin an order slip to the rail, get a numbered
+program — never cooks. They pin an order slip to the rail, get a numbered
 ticket back on the spot, and collect the dish later. When a dish burns,
 the kitchen sends out a note instead of closing, and the cook moves on to
 the next slip.
@@ -56,9 +56,9 @@ the next slip.
 
 **Task — a function sent to run elsewhere** · [Day 1, section B](day-01-a-function-runs-elsewhere.md)
 
-*What it is:* a plain function handed to a worker to run. Submitting it returns immediately; the work happens on the worker. In Ray, this is calling `f.remote(…)`.
+*What it is:* a plain function handed to a worker to run. Submitting it returns immediately, and the work happens on the worker. In Ray, this is calling `f.remote(…)`.
 
-*In the story:* an order slip: the waiter writes it, pins it to the rail, and walks away.
+*In the story:* an order slip. The waiter writes it, pins it to the rail, and walks away.
 
 </div>
 
@@ -68,7 +68,7 @@ the next slip.
 
 *What it is:* what submitting a task hands back at once: a reference to the task's future result. Ray calls it an `ObjectRef`.
 
-*In the story:* the numbered order ticket the waiter gets the moment they pin a slip — long before the food exists. The ticket is not the food; it is a promise of food.
+*In the story:* the numbered order ticket the waiter gets the moment they pin a slip — long before the food exists. The ticket is not the food. It is a promise of food.
 
 </div>
 
@@ -86,7 +86,7 @@ the next slip.
 
 **Task error — the burnt-dish note** · [Day 1, section C](day-01-a-function-runs-elsewhere.md)
 
-*What it is:* when a task crashes, the crash is caught on the worker and delivered to the task's ticket as an error, and the worker carries on. Ray reports this as a `RayTaskError`.
+*What it is:* when a task crashes, the worker catches the crash and delivers it to the task's ticket as an error. Then the worker carries on. Ray reports this as a `RayTaskError`.
 
 *In the story:* a dish burns, so the kitchen sends a note to the pass instead of the dish — “sorry, the oven caught fire” — and the cook picks up the next slip.
 
@@ -95,13 +95,13 @@ the next slip.
 ## Day 2 — the pass gets numbered spots
 
 Finished dishes stop travelling in private envelopes. They land on **the
-pass** under their ticket numbers and stay there, so a ticket becomes just
-a number: it can be photocopied, read twice, and handed to someone else.
+pass** under their ticket numbers and stay there. So a ticket becomes a
+plain number: it can be photocopied, read twice, and handed to someone else.
 A bell rings each time a dish lands. The waiter learns to glance at the
 pass with a time limit and take whichever dishes are up. And an order that
 needs another dish — pasta that needs the sauce — is clipped to the sauce's
-empty spot, and goes to the cook only once the sauce lands. If the sauce
-burned, the pasta is never cooked; its spot gets a copy of the note.
+empty spot. It goes to the cook only once the sauce lands. If the sauce
+burned, the pasta is never cooked, and its spot gets a copy of the note.
 
 <div class="concept" id="ticket-number">
 
@@ -127,7 +127,7 @@ burned, the pasta is never cooked; its spot gets a copy of the note.
 
 **The cook's stub — a guarantee that something will land** · [Day 2, section A](day-02-tickets-you-can-pass-around.md)
 
-*What it is:* the duty to store one task's outcome (`Promise`). It is kept when the task finishes or fails; if the job is thrown away unrun, dropping the promise stores a "worker stopped" error instead, so no reader ever waits forever.
+*What it is:* the duty to store one task's outcome (`Promise`). It is kept when the task finishes or fails. If the job is thrown away unrun, dropping the promise stores a "worker stopped" error instead, so no reader ever waits forever.
 
 *In the story:* the stub the cook keeps when a slip goes on the rail. Whatever happens to the order, something ends up on the pass under that number.
 
@@ -137,7 +137,7 @@ burned, the pasta is never cooked; its spot gets a copy of the note.
 
 **wait — a glance at the pass, with a time limit** · [Day 2, section B](day-02-tickets-you-can-pass-around.md)
 
-*What it is:* blocks until at least a given number of tickets have results — a failure counts — or a timeout passes, then splits the tickets into `(ready, pending)`, in their original order. Ray's version is `ray.wait`.
+*What it is:* blocks until at least a given number of tickets have results (a failure counts), or until a timeout passes. Then it splits the tickets into `(ready, pending)`, in their original order. Ray's version is `ray.wait`.
 
 *In the story:* the waiter holding several tickets stands at the pass for at most a few seconds and leaves with whichever dishes are up.
 
@@ -147,7 +147,7 @@ burned, the pasta is never cooked; its spot gets a copy of the note.
 
 **Held slip — a task whose input is another ticket** · [Day 2, section C](day-02-tickets-you-can-pass-around.md)
 
-*What it is:* `submit_with(&ticket, task)` returns a new ticket at once, but the task joins the worker's queue only when the input ticket's result lands; the task then receives the plain value. In Ray, passing an `ObjectRef` as a task argument does the same.
+*What it is:* `submit_with(&ticket, task)` returns a new ticket at once. But the task joins the worker's queue only when the input ticket's result lands, and then it receives the plain value. In Ray, passing an `ObjectRef` as a task argument does the same.
 
 *In the story:* the pasta slip, clipped to the empty spot where the sauce will land. When the sauce lands, the cook unclips the slip and pins it to the rail.
 
@@ -159,22 +159,22 @@ burned, the pasta is never cooked; its spot gets a copy of the note.
 
 *What it is:* if a held task's input failed, the task never runs, and its ticket carries the input's error, message intact — through any number of steps. Ray raises the original task's error at `ray.get` of any task downstream of it.
 
-*In the story:* the sauce burned, so the pasta is never cooked: the burnt-dish note is copied onto the pasta's spot on the pass.
+*In the story:* the sauce burned, so the pasta is never cooked. The burnt-dish note is copied onto the pasta's spot on the pass.
 
 </div>
 
 ## Day 3 — the pantry
 
 The kitchen discovers where its results really are. Every finished result
-sits, as one pot, in exactly one place — **the pantry** — and its spot on
-the pass holds only a label saying where. Collecting a dish the old way ladles a
-full copy into a fresh pot; a meter on the supply line shows what that
+sits, as one pot, in exactly one place: **the pantry**. Its spot on the
+pass holds only a label saying where. Collecting a dish the old way ladles
+a full copy into a fresh pot. A meter on the supply line shows what that
 costs when eight orders each need a huge pot of stock. So every task, and
 the waiter too, learns to look into the pot where it stands. A second cook joins, and the pass
 turns out to belong to the kitchen, not to a cook: one numbering, one
 place to look. Last, the waiter carries a delivery straight into the
-pantry — no slip, no cook — and everything in the pantry stays sealed, so
-any number of cooks can read it at once.
+pantry, with no slip and no cook. Everything in the pantry stays sealed,
+so any number of cooks can read it at once.
 
 <div class="concept" id="meter">
 
@@ -200,7 +200,7 @@ any number of cooks can read it at once.
 
 **Reading in place — a label, not a ladle** · [Day 3, section A](day-03-the-object-store.md)
 
-*What it is:* `Ticket::read` returns an `Arc<T>` pointing at the stored value, and `submit_reading` lends a task a read-only `&A` of its input; neither copies anything. `get` and `submit_with` remain, as "read, then copy." Ray's `ray.get` of a NumPy array is the same zero-copy read.
+*What it is:* `Ticket::read` returns an `Arc<T>` pointing at the stored value, and `submit_reading` lends a task a read-only `&A` of its input. Neither copies anything. `get` and `submit_with` remain, as "read, then copy." Ray's `ray.get` of a NumPy array is the same zero-copy read.
 
 *In the story:* looking into the pot where it stands, instead of having a fresh pot ladled out for you.
 
@@ -210,7 +210,7 @@ any number of cooks can read it at once.
 
 **One pass for the whole kitchen — one store, many workers** · [Day 3, section B](day-03-the-object-store.md)
 
-*What it is:* `Worker::start_in(name, &store)` starts a worker whose results land on a pass (`MemoryStore`) that other workers share. One pass means one numbering, one place for `wait` to look, and — through the pantry behind it — every worker can read every other worker's results in place. Ray's object store is both halves, the pass and the pantry, one per node; its object ids are unique across the cluster.
+*What it is:* `Worker::start_in(name, &store)` starts a worker whose results land on a pass (`MemoryStore`) that other workers share. One pass means one numbering and one place for `wait` to look. Through the pantry behind it, every worker can also read every other worker's results in place. Ray's object store is both halves, the pass and the pantry, one per node; its object ids are unique across the cluster.
 
 *In the story:* the pass belongs to the kitchen, not to a cook. Every cook puts dishes on it, and no two dishes ever share a number.
 
@@ -232,15 +232,15 @@ any number of cooks can read it at once.
 
 *What it is:* a stored value is immutable: readers get only shared references (`&T`), so the compiler refuses any attempt to change it. That is what makes sharing safe — readers need no lock, nobody sees a half-changed value, and a copy can never go stale. A changed version is a new value with a new id. Ray's objects are immutable for the same reasons.
 
-*In the story:* everything in the pantry is sealed. Cooks look; nobody pours anything back in.
+*In the story:* everything in the pantry is sealed. Cooks look, and nobody pours anything back in.
 
 </div>
 
 ## Day 4 — the crew
 
 The kitchen hires a **crew**. At first the waiter picks a cook for every
-slip, taking turns — and a quick slip waits behind a big slip on one
-cook's rail while the cook at the next stove stands idle. So the cooks
+slip, taking turns. Then a quick slip waits behind a big slip on one
+cook's rail, while the cook at the next stove stands idle. So the cooks
 give up their own rails: the waiter pins every slip to **one rail**, and
 whichever cook is free walks over and takes the next one. Held slips and
 the pantry work for the crew exactly as for a lone cook, because the
@@ -255,7 +255,7 @@ cook busy to the end.
 
 *What it is:* a fixed number of worker threads (`Pool`), started once and reused for every task, all taking jobs from one shared queue and putting results on one store. Ray starts a pool of worker processes on every node — by default about one per CPU core — and reuses them for task after task.
 
-*In the story:* a crew of cooks sharing one kitchen. No cook belongs to any slip; any free cook cooks the next one.
+*In the story:* a crew of cooks sharing one kitchen. No cook belongs to any slip, and any free cook cooks the next one.
 
 </div>
 
@@ -283,7 +283,7 @@ cook busy to the end.
 
 **Speedup — more cooks, less time, measured** · [Day 4, section C](day-04-many-workers-one-scheduler.md)
 
-*What it is:* the time a job takes on one worker divided by its time on N workers. It reaches N only when the whole job can be split into equal parts. Amdahl's law adds a cap: the part that cannot be split (handing out tasks, adding up answers) limits the speedup however many workers you add — on Day 4 that part takes well under a millisecond, so it starts to matter only once tasks cross a network. On Day 4's machine, a prime-counting job ran about 1.8× to 1.9× faster on two threads, and about 3.3× to 3.9× faster on four — never a clean 4×.
+*What it is:* the time a job takes on one worker divided by its time on N workers. It reaches N only when the whole job can be split into equal parts. Amdahl's law adds a cap: the part that cannot be split (handing out tasks, adding up answers) limits the speedup however many workers you add. On Day 4 that part takes well under a millisecond, so it starts to matter only once tasks cross a network. On Day 4's machine, a prime-counting job ran about 1.8× to 1.9× faster on two threads, and about 3.3× to 3.9× faster on four — never a clean 4×.
 
 *In the story:* a crew of four does not cook a big order in exactly a quarter of the time: the waiter still hands out every slip, and the order is done only when the last slip is.
 
@@ -293,36 +293,36 @@ cook busy to the end.
 
 **Slip size — how finely to cut a job** · [Day 4, section C](day-04-many-workers-one-scheduler.md)
 
-*What it is:* how much of a job one task carries: split the job into more tasks, and each one is smaller. Too few, unequal tasks leave workers idle while the last big one finishes; too many tiny tasks spend their time on per-task overhead. Ray's tips for first-time users warn against tiny tasks for that reason.
+*What it is:* how much of a job one task carries: split the job into more tasks, and each one is smaller. Too few, unequal tasks leave workers idle while the last big one finishes. Too many tiny tasks spend their time on per-task overhead. Ray's tips for first-time users warn against tiny tasks for that reason.
 
-*In the story:* cut a big order into a few large slips, and three cooks may wait for the fourth; cut it into crumbs, and the cooks spend the evening walking to the rail.
+*In the story:* cut a big order into a few large slips, and three cooks may wait for the fourth. Cut it into crumbs, and the cooks spend the evening walking to the rail.
 
 </div>
 
 ## Day 5 — the bar
 
 A guest at the bar runs a **tab**, and a tab has to last from one drink
-to the next — something no slip can do. The crew tries keeping one tab
-book behind a lock: every drink gets written, but the bill, which takes
+to the next, and no slip can do that. The crew tries keeping one tab
+book behind a lock. Every drink gets written, but the bill, which takes
 no time to pour, is written first and comes out empty. So the restaurant
-hires a **bartender**: a worker with a memory — the tabs — and a rail of
-their own. Nobody else touches the tabs; you pin a call to the
-bartender's rail, get a ticket on the spot, and the bartender takes the
+hires a **bartender**: a worker with a memory (the tabs) and a rail of
+their own. Nobody else touches the tabs. You pin a call to the
+bartender's rail and get a ticket on the spot, and the bartender takes the
 calls one at a time, in the order they were pinned. Two bartenders never
 wait for each other, and cooks read their answers off the pass like any
 dish. When a glass slips, a note comes back, the bartender stays on
 shift, and whatever was already written on the tab stays written. Last,
 the crew pours the drinks side by side while the bartender writes each
-one down, in the order the guests asked — waiting at a call whose drink
-isn't up yet, with every later call waiting behind it.
+one down, in the order the guests asked. The bartender waits at a call whose drink
+isn't up yet, and every later call waits behind it.
 
 <div class="concept" id="one-lock">
 
 **A lock keeps writes, not order** · [Day 5, section A](day-05-actors-workers-with-memory.md)
 
-*What it is:* state shared by many tasks behind a lock (`Arc<Mutex<…>>`). The lock makes sure no two tasks change it at the same moment, so no change is lost; it does nothing about *which* task gets there first. On a pool, a quick task overtakes a slow one, so changes land in the order tasks finish, not the order they were sent. In Ray the tasks are separate processes and could not even share the lock; Ray's docs say to put such state in an actor instead.
+*What it is:* state shared by many tasks behind a lock (`Arc<Mutex<…>>`). The lock makes sure no two tasks change it at the same moment, so no change is lost. It does nothing about *which* task gets there first. On a pool, a quick task overtakes a slow one, so changes land in the order tasks finish, not the order they were sent. In Ray the tasks are separate processes and could not even share the lock. Ray's docs say to put such state in an actor instead.
 
-*In the story:* one tab book for the whole crew. The cooks take turns writing in it, and every drink gets written — but the bill, which takes no time to pour, gets written first.
+*In the story:* one tab book for the whole crew. The cooks take turns writing in it, and every drink gets written. But the bill, which takes no time to pour, gets written first.
 
 </div>
 
@@ -330,9 +330,9 @@ isn't up yet, with every later call waiting behind it.
 
 **Actor — the bartender** · [Day 5, section A](day-05-actors-workers-with-memory.md)
 
-*What it is:* a dedicated thread (`Actor<S>`) that owns a value of type `S` — the actor's state — and runs the calls sent to it, one at a time, on that thread. The state moves in when the actor starts and never comes out, so it needs no lock. Ray's actors are the same idea: `@ray.remote` on a class, one dedicated worker process per instance.
+*What it is:* a dedicated thread (`Actor<S>`) that owns a value of type `S` (the actor's state) and runs the calls sent to it, one at a time, on that thread. The state moves in when the actor starts and never comes out, so it needs no lock. Ray's actors are the same idea: `@ray.remote` on a class, one dedicated worker process per instance.
 
-*In the story:* the bartender. Like a cook, the bartender works through what is pinned to their rail. Unlike a cook, they keep things behind the bar — today, the tabs. Nobody else reaches over the bar.
+*In the story:* the bartender. Like a cook, the bartender works through what is pinned to their rail. Unlike a cook, they keep things behind the bar: today, the tabs. Nobody else reaches over the bar.
 
 </div>
 
@@ -340,7 +340,7 @@ isn't up yet, with every later call waiting behind it.
 
 **Mailbox — the bartender's rail** · [Day 5, section A](day-05-actors-workers-with-memory.md)
 
-*What it is:* the actor's own channel of calls. The actor takes them strictly one at a time, oldest first, so the order calls were sent in is the order they run in — the actor's one promise. Ray keeps the same promise for the calls from one submitter.
+*What it is:* the actor's own channel of calls. The actor takes them strictly one at a time, oldest first, so the order calls were sent in is the order they run in. That is the actor's one promise. Ray keeps the same promise for the calls from one submitter.
 
 *In the story:* the bartender's own rail. Calls are pinned to it in order, and the bartender never skips ahead.
 
@@ -350,9 +350,9 @@ isn't up yet, with every later call waiting behind it.
 
 **A call — a slip for the bartender** · [Day 5, section A](day-05-actors-workers-with-memory.md)
 
-*What it is:* `actor.call(|state| …)` sends a function that takes the actor's state (`&mut S`) and returns a ticket at once; the answer lands on the same pass as every task's result. It is our version of Ray's `actor.method.remote(…)`.
+*What it is:* `actor.call(|state| …)` sends a function that takes the actor's state (`&mut S`) and returns a ticket at once. The answer lands on the same pass as every task's result. It is our version of Ray's `actor.method.remote(…)`.
 
-*In the story:* a slip pinned to the bartender's rail — "put a beer on table 4" — with a ticket for the answer, which comes out on the pass like any dish.
+*In the story:* a slip pinned to the bartender's rail, such as "put a beer on table 4", with a ticket for the answer. The answer comes out on the pass like any dish.
 
 </div>
 
@@ -370,9 +370,9 @@ isn't up yet, with every later call waiting behind it.
 
 **A failed call — the slipped glass** · [Day 5, section B](day-05-actors-workers-with-memory.md)
 
-*What it is:* a call that panics becomes a task error on its own ticket, and the actor carries on with the next call. Nothing is rolled back: whatever the call changed before the panic stays changed, so calls should check first and change last. Ray behaves the same for an exception in an actor method; an actor whose process dies is Day 13's subject.
+*What it is:* a call that panics becomes a task error on its own ticket, and the actor carries on with the next call. Nothing is rolled back: whatever the call changed before the panic stays changed, so calls should check first and change last. Ray behaves the same for an exception in an actor method. An actor whose process dies is Day 13's subject.
 
-*In the story:* the bartender puts a beer on the tab, then drops the glass. A note goes out instead of the beer, the bartender stays on shift — and the beer stays on the tab.
+*In the story:* the bartender puts a beer on the tab, then drops the glass. A note goes out instead of the beer, the bartender stays on shift, and the beer stays on the tab.
 
 </div>
 
@@ -380,8 +380,8 @@ isn't up yet, with every later call waiting behind it.
 
 **A call that waits in line** · [Day 5, section C](day-05-actors-workers-with-memory.md)
 
-*What it is:* `actor.call_reading(&ticket, |state, value| …)` joins the mailbox at once. When its turn comes, the actor waits for the ticket's result to land, then reads it in place; every later call waits too, so the order holds. If the input failed, the call never runs and its ticket carries the same error. Unlike a held slip, it never steps aside — stepping aside would let later calls overtake it.
+*What it is:* `actor.call_reading(&ticket, |state, value| …)` joins the mailbox at once. When its turn comes, the actor waits for the ticket's result to land, then reads it in place. Every later call waits too, so the order holds. If the input failed, the call never runs and its ticket carries the same error. Unlike a held slip, it never steps aside, because stepping aside would let later calls overtake it.
 
-*In the story:* "when the cocktail is up, put it on table 4's tab." The bartender reaches that call and waits for the cocktail; the calls behind it wait too, so the drinks go on the tab in the order the guests asked.
+*In the story:* "when the cocktail is up, put it on table 4's tab." The bartender reaches that call and waits for the cocktail. The calls behind it wait too, so the drinks go on the tab in the order the guests asked.
 
 </div>

@@ -38,22 +38,22 @@ dependencies at all**: everything comes from Rust's standard library.
 ## 1. What you will have running
 
 By the end of today, `cargo run` hands an ordinary Rust function to a
-**worker** — a second line of work running alongside your program — and
-gets a **ticket** back instantly, while the function is still running.
-Later it trades the ticket in for the answer. Then it hands the same worker
-a function that crashes, and gets back a clean error instead of a dead
-program — and the worker carries straight on with the next job.
+**worker**: a second line of work running alongside your program. It gets
+a **ticket** back instantly, while the function is still running. Later it
+trades the ticket in for the answer. Then it hands the same worker a
+function that crashes. Instead of a dead program, it gets back a clean
+error, and the worker carries straight on with the next job.
 
 That is the first idea Ray is built on, in about 100 lines: **submit a
 function, hold a ticket, collect the answer — or the reason there is
-none.** Only one thing is small — there is exactly one worker, on this
+none.** Only one thing is small: there is exactly one worker, on this
 machine. Everything else has the shape of the real thing.
 
 ## 2. What you will be seeing in the output
 
-A sneak peek before anything else: here is the exact output you will
+Here is a sneak peek before anything else: the exact output you will
 produce today, with a plain-English note under each line. Don't worry if a
-note doesn't fully click yet — the rest of the day builds each piece:
+note doesn't fully click yet. The rest of the day builds each piece:
 
 ```text
 submitted slow_square(7); ticket in hand after 0 ms
@@ -75,7 +75,7 @@ same worker, next task -> 9
 
 - The three `thread 'worker-0' … panicked` lines — a task crashed on
   purpose. This is Rust's standard crash report, printed by the worker
-  thread (the number in brackets is a thread id and differs every run).
+  thread. The number in brackets is a thread id, and it differs every run.
 
 - `get -> error: task failed: the oven caught fire` — the crash did not
   take the program down. It came home through the ticket, as an ordinary
@@ -86,9 +86,9 @@ same worker, next task -> 9
 
 ## 3. Why we need it
 
-The Day 0 scaffold (`v1-day-00`) does everything on one thread, in one
+Your Day 0 scaffold (`v1-day-00`) does everything on one thread, in one
 place, in order. Every distributed system — Ray, Spark, a job queue behind
-a website — starts from the opposite idea: **the code that asks for work
+a website — starts from the opposite idea. **The code that asks for work
 and the code that does the work are different workers**, and the asker
 should not have to stand there waiting. Three primitives make that
 possible:
@@ -100,15 +100,15 @@ possible:
 - **an error path**: a failure that travels back through the ticket
   instead of killing whoever did the work.
 
-Today's three sections build one primitive each. And they are one story,
-the one this whole book keeps telling: **the running story, for all 17
-days, is a restaurant kitchen that grows into a chain.** Today it is a
-single cook. Section A hires the cook, section B introduces order tickets,
-section C decides what happens when a dish burns. (On Day 4 the kitchen
-hires more cooks; on Day 7 it opens a second restaurant across town.) The
-whole story, scene by scene, lives on one page —
-[The restaurant chain: an analogy to help you build the right mental model](story.md) — which grows by one scene
-every day.
+Today's three sections build one primitive each, and together they tell
+one story. It is the story this whole book keeps telling: **the running
+story, for all 17 days, is a restaurant kitchen that grows into a chain.**
+Today it is a single cook. Section A hires the cook. Section B introduces
+order tickets. Section C decides what happens when a dish burns. (On Day 4
+the kitchen hires more cooks, and on Day 7 it opens a second restaurant
+across town.) The whole story, scene by scene, lives on one page:
+[The restaurant chain: an analogy to help you build the right mental model](story.md).
+It grows by one scene every day.
 
 ## 4. Mental model
 
@@ -116,19 +116,19 @@ Walk the kitchen, one station per section:
 
 - **The cook (section A's worker).** One cook, standing at the stove,
   working through order slips from a rail — one at a time, oldest first.
-  The waiter (your `main`) never cooks; they pin a slip to the rail and
+  The waiter (your `main`) never cooks. They pin a slip to the rail and
   walk away. At closing time the cook finishes every slip already on the
   rail before going home.
 
 - **The order ticket (section B).** Pinning a slip gives the waiter a
   numbered ticket, on the spot — long before the food exists. The ticket
-  is not the food; it is a *promise* of food. Showing the ticket at the
-  pass — the counter where finished dishes come out of the kitchen — means
-  "I'll wait here until that dish is ready."
+  is not the food. It is a *promise* of food. The pass is the counter
+  where finished dishes come out of the kitchen. Showing the ticket there
+  means "I'll wait here until that dish is ready."
 
 - **The burnt dish (section C).** Sometimes a dish burns. A good kitchen
-  doesn't close; the cook scrapes the pan, sends out a note — "sorry, the
-  oven caught fire" — in place of the dish, and picks up the next slip.
+  doesn't close. The cook scrapes the pan, sends out a note in place of
+  the dish — "sorry, the oven caught fire" — and picks up the next slip.
 
 ```text
 main (the waiter)                       worker-0 (the cook)
@@ -153,15 +153,15 @@ main (the waiter)                       worker-0 (the cook)
 
 - **Ticket (Ray's `ObjectRef`)**: what `.remote()` hands back — a
   reference to a result that may not exist yet. Today's `Ticket<T>` is the
-  one-machine version; Day 2 gives tickets ids so they can be passed
-  around and waited on in bulk.
+  one-machine version. Day 2 gives tickets ids, so you can pass them
+  around and wait on them in bulk.
 
 - **`get`**: Ray's `ray.get(ref)` blocks until the result exists and
   returns it — or raises the task's error. Today's `Ticket::get` does
   exactly that, with Rust's `Result` in place of an exception.
 
-- **Task errors**: when a Ray task raises, the exception is caught on the
-  worker, shipped home, and re-raised at `ray.get` as a `RayTaskError`.
+- **Task errors**: when a Ray task raises, Ray catches the exception on the
+  worker, ships it home, and re-raises it at `ray.get` as a `RayTaskError`.
   The worker process stays alive for the next task. Today's `TaskError` is
   the same contract.
 
@@ -170,8 +170,8 @@ main (the waiter)                       worker-0 (the cook)
 Each section opens with a **Rust used here** strip: the language concepts
 its code leans on, linked to the matching pages of Google's
 [Comprehensive Rust](https://google.github.io/comprehensive-rust/) course.
-Click any of them to read that page in a side panel *beside* this chapter —
-no prior Rust needed, and no leaving the page (Esc or × closes it).
+Click any of them to read that page in a side panel *beside* this chapter.
+You need no prior Rust, and you never leave the page (Esc or × closes it).
 
 ### Section A — a worker thread and its queue
 
@@ -186,29 +186,29 @@ no prior Rust needed, and no leaving the page (Esc or × closes it).
 <a href="https://google.github.io/comprehensive-rust/testing/unit-tests.html">unit tests (<code>#[test]</code>, <code>#[cfg(test)]</code>)</a>
 </div>
 
-A **thread** is an independent line of execution inside your program: two
-threads run at the same time, each with its own place in the code. Our
-worker is one extra thread that loops: *take the next job, run it,
-repeat* — until closing time. The rail of order slips is a **channel** — a queue with a sending
-end and a receiving end. The sending end stays with `main`; the receiving
-end moves into the worker thread.
+A **thread** is an independent line of execution inside your program. Two
+threads run at the same time, each with its own place in the code. Your
+worker is one extra thread that loops — *take the next job, run it,
+repeat* — until closing time. The rail of order slips is a **channel**: a
+queue with a sending end and a receiving end. The sending end stays with
+`main`. The receiving end moves into the worker thread.
 
 What is a "job"? Any function the worker may call exactly once. In Rust
-that is written `Box<dyn FnOnce() + Send + 'static>` — read it left to
+you write that as `Box<dyn FnOnce() + Send + 'static>`. Read it left to
 right:
 
-- `FnOnce()` — something callable with no arguments, at most once (a
-  closure that captured `7` can be called; it cannot be un-called).
+- `FnOnce()` — something you can call with no arguments, at most once. A
+  closure that captured `7` can be called, but it cannot be un-called.
 
 - `+ Send` — safe to move to another thread. The compiler checks this for
-  every value you capture; share something that isn't thread-safe and the
-  program does not compile.
+  every value you capture. If you share something that isn't thread-safe,
+  the program does not compile.
 
 - `+ 'static` — it owns everything it uses, so it cannot outlive a value
   it borrowed from `main`.
 
-- `Box<dyn …>` — different closures have different sizes and types; a
-  `Box` stores any of them behind one pointer, so a channel can carry all
+- `Box<dyn …>` — different closures have different sizes and types. A
+  `Box` stores any of them behind one pointer, so one channel can carry all
   of them.
 
 Create `src/worker.rs`:
@@ -271,9 +271,9 @@ impl Drop for Worker {
 Four things are doing all the work here:
 
 - `mpsc::channel()` makes the rail. *mpsc* means "multiple producer,
-  single consumer": many senders may pin slips, exactly one worker takes
-  them. Receiving from a channel whose senders are all gone ends the
-  `for job in receiver` loop — that is how the cook knows it's closing time.
+  single consumer": many senders may pin slips, and exactly one worker
+  takes them. Once every sender is gone, the `for job in receiver` loop
+  ends. That is how the cook knows it's closing time.
 
 - `thread::Builder::new().name(…).spawn(move || …)` starts the thread and
   names it `worker-0` — a name you will see in crash reports. `move`
@@ -281,15 +281,15 @@ Four things are doing all the work here:
   the receiving end.
 
 - `execute` never waits. `send` puts the job on the rail and returns at
-  once; whether the job has run yet is none of the caller's business.
+  once. Whether the job has run yet is none of the caller's business.
 
 - `Drop` is Rust's "closing time" hook: it runs automatically when a
-  `Worker` goes out of scope. It drops the sender first (the rail closes),
-  then `join`s the thread — *waits for it to finish*. So queued jobs are
+  `Worker` goes out of scope. It drops the sender first, which closes the
+  rail. Then it `join`s the thread: it *waits for the cook to finish*. So queued jobs are
   never lost on shutdown. The two `Option`s exist only so `Drop` can take
   each field out exactly once.
 
-Now a demo. Replace `src/main.rs` with:
+Now try it with a demo. Replace `src/main.rs` with:
 
 ```rust,ignore
 mod worker;
@@ -330,11 +330,11 @@ all jobs done; worker stopped
 Read it line by line:
 
 - `main runs on thread "main"` — the waiter introduces itself. Your
-  program's starting thread is always called `main`; `thread::current()`
-  looked up its name.
+  program's starting thread is always called `main`, and
+  `thread::current()` looked up its name.
 
-- `job 1 runs on thread "worker-0"`, then jobs 2 and 3 — each order slip
-  was cooked by the cook, not the waiter. `execute` put the three jobs on
+- `job 1 runs on thread "worker-0"`, then jobs 2 and 3 — the cook, not
+  the waiter, cooked each order slip. `execute` put the three jobs on
   the rail, and the loop inside `Worker::start` ran them one by one, in the
   order they arrived.
 
@@ -392,17 +392,17 @@ mod tests {
 ```
 
 Two new marks sit in that code. `#[test]` above a function tells Rust
-"this is a test": `cargo test` finds and runs every function marked that
+"this is a test." `cargo test` finds and runs every function marked that
 way. `#[cfg(test)]` above `mod tests` means "compile this module only when
 running tests", so the tests never end up inside the program itself.
 Lines that start with `#[` are called *attributes*: short notes to the
 compiler, written just above the thing they describe.
 
-The tests need somewhere for the worker to *write* while the test *reads*,
-and two threads may not touch the same value unguarded — the compiler
-refuses. Two standard tools make it legal, and you can read them as
-labels for now: [`Arc`](https://google.github.io/comprehensive-rust/concurrency/shared-state/arc.html)
-lets both threads hold the same value, and
+The tests need somewhere for the worker to *write* while the test *reads*.
+But the compiler refuses to let two threads touch the same value unguarded.
+Two standard tools make it legal, and for now you can read them as labels.
+[`Arc`](https://google.github.io/comprehensive-rust/concurrency/shared-state/arc.html)
+lets both threads hold the same value.
 [`Mutex`](https://google.github.io/comprehensive-rust/concurrency/shared-state/mutex.html)
 (or an atomic, for a single flag) makes them take turns. Day 3's object
 store gives shared data a proper home.
@@ -525,7 +525,7 @@ the day, and every part of it earns its place:
 
 - `submit<T, F>` makes the method *generic*: one method that works for
   every task type `F` and every result type `T`. `slow_square` returns a
-  `u64`; a later task might return a `String` or a `Vec`.
+  `u64`. A later task might return a `String` or a `Vec`.
 
 - The `where` clause states the rules. `F` must be callable once and
   return a `T`. Both must be safe to send to another thread (`Send`), and
@@ -538,10 +538,10 @@ the day, and every part of it earns its place:
 Three details in the ticket are worth a second look:
 
 - `#[derive(Debug)]` above `TaskError` asks the compiler to write the code
-  that prints a `TaskError` for programmers, with `{:?}` — you get it for
-  free instead of writing it yourself. That is different from `Display`,
-  which you did write, and which is the polite message for users.
-  `expect` uses the `Debug` form when it crashes, and you will see it in
+  that prints a `TaskError` for programmers, with `{:?}`. You get that
+  code for free instead of writing it yourself. `Debug` is different from
+  `Display`, which you did write: `Display` is the polite message for users.
+  `expect` uses the `Debug` form when it crashes. You will see that form in
   [Break it deliberately](#10-break-it-deliberately):
   `TaskError { message: "…" }`.
 
@@ -553,10 +553,10 @@ Three details in the ticket are worth a second look:
   is gone without sending anything. That can only happen if the job never
   ran — for example, the worker thread had already died, so the job was
   thrown away. In that case `get` reports *"worker stopped before the task
-  finished"* instead of waiting forever. Remember this line; you will watch
+  finished"* instead of waiting forever. Remember this line. You will watch
   it fire in [Break it deliberately](#10-break-it-deliberately).
 
-Next, a real task to try it on. Replace `src/main.rs` with:
+Next, give it a real task to try. Replace `src/main.rs` with:
 
 ```rust,ignore
 mod worker;
@@ -603,10 +603,10 @@ cook had even started. The second comes from `get`: the waiter stood at
 the counter for the 300 ms the cooking took, then got 49. That gap — 0 ms
 to submit, 300 ms to collect — is the whole point of today. Between those
 two lines, `main` was free to do anything else: submit ten more tasks,
-read a file, answer a user. Nothing in the demo uses that freedom yet; on
+read a file, answer a user. Nothing in the demo uses that freedom yet. On
 Day 4, with several cooks, you will measure what it buys.
 
-Two tests pin the new behavior. Two edits, inside `mod tests`:
+Two tests pin the new behavior. Make two edits inside `mod tests`:
 
 1. Add `mpsc` to the tests' `std::sync` import (around line 106), so the
    line reads `use std::sync::{Arc, Mutex, mpsc};`.
@@ -683,15 +683,15 @@ uncaught exception in other languages. Follow it step by step:
 3. Every job still waiting on the rail is thrown away unrun, so every one
    of their tickets reports the same.
 
-One burnt dish closes the whole kitchen. Ray refuses that trade: a failing
-task is reported to the code that submitted it, and the worker carries on.
-Rust has the tool for this. `std::panic::catch_unwind(f)` runs `f`; if `f`
-panics, it stops the crash right there and returns `Err(payload)` instead,
-where the *payload* is the panic's message, boxed up.
+One burnt dish closes the whole kitchen. Ray refuses that trade. It
+reports a failing task to the code that submitted it, and the worker
+carries on. Rust has the tool for this. `std::panic::catch_unwind(f)` runs
+`f`. If `f` panics, `catch_unwind` stops the crash right there and returns
+`Err(payload)` instead. The *payload* is the panic's message, boxed up.
 
-The plan: catch the panic where the task runs, and send the error home
-through the same private channel as a normal answer. Five edits to
-`src/worker.rs`, in order:
+Here is the plan. Catch the panic where the task runs, and send the error
+home through the same private channel as a normal answer. That takes five
+edits to `src/worker.rs`, in order:
 
 **First**, the imports. Add two lines at the top of the file, so it
 starts:
@@ -764,7 +764,7 @@ Two new names appeared in those edits:
 
 - `AssertUnwindSafe` is you making a promise the compiler cannot check for
   itself: that a crash halfway through the task will not leave shared data
-  half-updated. Our tasks share nothing with the worker, so the promise
+  half-updated. These tasks share nothing with the worker, so the promise
   holds.
 
 - In `from_panic`, a panic can carry a value of *any* type, so its payload
@@ -822,7 +822,7 @@ Read the new lines one by one:
 - `get -> error: task failed: the oven caught fire` — the bad news arrives
   at the counter as a note, not a closed kitchen. `catch_unwind` in
   `submit` caught the crash, `from_panic` turned it into a `TaskError`, and
-  `get` handed it back; the `match` in `main` printed it through
+  `get` handed it back. The `match` in `main` printed it through
   `TaskError`'s `Display`.
 
 - `same worker, next task -> 9` — the cook is still on shift. The very
@@ -918,10 +918,10 @@ driver program carries on.
 
 ## 9. Test it
 
-Seven tests now pin today's behavior — execution on the worker thread,
-order, and graceful shutdown (section A), tickets that arrive before the
-answer and deliver it (section B), and panics turned into errors while the
-worker survives (section C):
+Seven tests now pin today's behavior. Section A's tests check execution on
+the worker thread, order, and graceful shutdown. Section B's check tickets
+that arrive before the answer and then deliver it. Section C's check that
+panics turn into errors while the worker survives:
 
 ```bash
 cargo test
@@ -941,7 +941,7 @@ test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ```
 
 (With `cargo test -- --nocapture` you would also see the crash reports of
-the three panicking tasks; by default the test runner hides output from
+the three panicking tasks. By default, the test runner hides output from
 passing tests.)
 
 ## 10. Break it deliberately
@@ -1002,10 +1002,10 @@ test worker::tests::a_panicking_task_becomes_an_error_on_its_ticket ... FAILED
 ```
 
 (plus the four passing tests and a failure summary). All three section C
-tests fail, and nothing else — each pins one piece of the protection you
-removed.
+tests fail, and nothing else does. Each one pins one piece of the
+protection you removed.
 
-Two lessons, both of which return with full force later:
+There are two lessons here, and both return with full force later:
 
 - **A task's failure must stay the task's.** Without isolation, one bad
   input takes down the worker and every task queued behind it. Ray runs
@@ -1014,8 +1014,8 @@ Two lessons, both of which return with full force later:
 
 - **"The worker died" is a different error from "the task failed."**
   Today's engine can at least *tell you* which one happened. Day 12 goes
-  further: when a worker dies mid-task, the task is re-run elsewhere and
-  the answer still arrives.
+  further: when a worker dies mid-task, the engine re-runs the task
+  elsewhere and the answer still arrives.
 
 Restore the `catch_unwind` line and confirm `cargo test` is green again.
 
@@ -1055,23 +1055,24 @@ git diff v1-day-00 v1-day-01
 
 ## 12. Recap
 
-**What changed today:** the project gained a `worker` module — one named
-worker thread fed by a channel, with graceful shutdown on `Drop`;
-`submit`, which turns any function into a task and returns a typed
-`Ticket` at once; and panic isolation, so a crashing task becomes a
+**What changed today:** your project gained a `worker` module. It holds
+one named worker thread fed by a channel, with graceful shutdown on `Drop`.
+It has `submit`, which turns any function into a task and returns a typed
+`Ticket` at once. And it isolates panics, so a crashing task becomes a
 `TaskError` on its own ticket while the worker survives. Seven tests pin
-it across three section checkpoints (`v1-day-01a`, `v1-day-01b`,
+it all across three section checkpoints (`v1-day-01a`, `v1-day-01b`,
 `v1-day-01c`), with no dependencies beyond the standard library.
 
 **Deliberately naive:** there is one worker, so tasks run strictly one
-after another; a ticket can only be cashed in by the code that holds it,
-once, and cannot be handed to another task; results live inside the
+after another. Only the code that holds a ticket can cash it in, once, and
+it cannot hand the ticket to another task. Results live inside the
 ticket's private channel, so a big result is copied into it rather than
-stored anywhere shared; and a task that loops forever blocks the kitchen
-for good — there is no timeout.
+stored anywhere shared. And a task that loops forever blocks the kitchen
+for good, because there is no timeout.
 
 **Tomorrow's limitation, resolved on Day 2:** today's ticket is a private
-envelope. On Day 2 results move out of the envelopes into a table keyed by
-id, and tickets become ids — so you can check without blocking, wait for
-the first of several, and pass a ticket *into another task* before its
-answer exists: the move that lets Ray chain work into pipelines.
+envelope. On Day 2, results move out of the envelopes into a table keyed
+by id, and tickets become ids. Then you can check without blocking and
+wait for the first of several. You can also pass a ticket *into another
+task* before its answer exists. That move is what lets Ray chain work into
+pipelines.

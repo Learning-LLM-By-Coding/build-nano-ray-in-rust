@@ -30,7 +30,7 @@ git switch --detach v1-day-03a         # then 03b, 03c as you pass each section
 | B | `Worker::start_in` · ~15 lines | one demo function + 2 helpers, 3 tests |
 | C | `put` · ~10 lines | one demo function, 5 tests |
 
-Section A is the longest sitting of the day; sections B and C are short.
+Section A is the longest sitting of the day, and sections B and C are short.
 Three sections are three natural sittings, and every checkpoint is a save
 point — nothing says a "day" must fit in one. Still **no dependencies**:
 everything comes from Rust's standard library.
@@ -41,23 +41,23 @@ everything comes from Rust's standard library.
 
 Yesterday a result could be read many times, through any copy of its
 ticket. But each time a task or your program collected a result, it got
-its own *copy* of it. For a number, a copy costs nothing. For a big value
-— an image, a table, a model's weights — copying is most of the work. By
-the end of today, `cargo run` does four new things:
+its own *copy* of it. For a number, a copy costs nothing. But for a big
+value, such as an image, a table or a model's weights, copying is most of
+the work. By the end of today, `cargo run` does four new things:
 
 - **measures the copying.** The program counts every byte of fresh memory
   it asks for. Eight small tasks that each need one 64 MiB value make
   512 MiB of copies.
 
 - **shares instead of copying.** The same eight tasks read the one stored
-  value where it sits: no fresh memory at all, and every task sees the
-  very same bytes.
+  value where it sits. They need no fresh memory at all, and every task
+  sees the very same bytes.
 
 - **lets several workers share one store,** so their results get one
   numbering, and each worker can read the others' results without a copy.
 
-- **stores a value you already have** — no task, no worker, no waiting —
-  and hands back a ticket for it on the spot.
+- **stores a value you already have**, with no task, no worker and no
+  waiting, and hands back a ticket for it on the spot.
 
 That is Ray's object store in miniature: **put a value in once, and
 everyone reads that one copy.**
@@ -74,7 +74,7 @@ everyone reads that one copy.**
 
 A sneak peek at the end of the day — the exact output you will produce,
 with a plain-English note under each group of lines. If a note doesn't
-fully land yet, that's fine; the rest of the day builds every piece:
+fully land yet, that's fine. The rest of the day builds every piece:
 
 ```text
 submit make_stock         -> ticket #1, ready: true
@@ -95,23 +95,23 @@ cooks finished yet?       -> 0 of 2
 saw the delivery's bytes  -> 8 of 8
 ```
 
-- The first line — a job builds one big value: 64 MiB of bytes. It is
-  stored under number `#1`.
+- The first line — a job builds one big value, 64 MiB of bytes, and the
+  value is stored under number `#1`.
 
-- `get #1` — collecting that value the old way hands over a full copy:
-  64 MiB of fresh memory, in about 4 ms.
+- `get #1` — collecting that value the old way hands over a full copy.
+  That is 64 MiB of fresh memory, in about 4 ms.
 
 - `8 tasks, submit_with` — eight jobs each need the value, and each gets
-  its own copy: 8 × 64 = 512 MiB. The work itself is tiny; the copying is
-  the whole cost.
+  its own copy: 8 × 64 = 512 MiB. The work itself is tiny, so the copying
+  is the whole cost.
 
-- `read #1` and `8 tasks, submit_reading` — the new way: look at the one
-  stored value instead of copying it. No fresh memory, and no time worth
-  measuring.
+- `read #1` and `8 tasks, submit_reading` — the new way looks at the one
+  stored value instead of copying it. It uses no fresh memory, and no time
+  worth measuring.
 
 - `saw #1's own bytes` — proof by address. Each job reported *where in
   memory* the bytes it looked at live. None of the eight copies sit at the
-  original's address; all eight readers do.
+  original's address, but all eight readers do.
 
 - The next five lines — two workers now share one store. Their results
   get one numbering (`#1`, `#2`, `#3`, never two `#1`s). Waiting for both
@@ -119,10 +119,10 @@ saw the delivery's bytes  -> 8 of 8
   second worker reads the first one's 64 MiB without a copy.
 
 - `both cooks busy` down to the last line — the program hands its *own*
-  64 MiB value to the store. It is stored and ready at once, even though
-  both workers are still busy for 300 ms — no worker was needed, and not a
-  byte was copied. When the workers free up, eight jobs on the two of them
-  read it — and all eight see the very bytes the program made.
+  64 MiB value to the store. The value is stored and ready at once, even
+  though both workers are still busy for 300 ms. No worker was needed, and
+  not a byte was copied. When the workers free up, eight jobs on the two
+  of them read it, and all eight see the very bytes the program made.
 
 ## 3. Why we need it
 
@@ -139,22 +139,23 @@ working the moment the dishes get big or the kitchen gets busy:
 - **Every collection is a fresh ladle.** Collecting a result with
   [`get`](story.md#get) ladles a full copy into a new pot for you, and
   every held slip gets its own pot too. For a bowl of soup that's fine.
-  For a huge pot of stock that eight orders need a little of, the kitchen
-  fills eight new pots — and you will measure exactly that in a minute.
+  But take a huge pot of stock that eight orders each need a little of.
+  The kitchen fills eight new pots, and you will measure exactly that in a
+  minute.
 
-- **Every cook brings their own pass.** Hire a second cook and they bring
-  a second counter with its own numbering. Two different dishes can both
+- **Every cook brings their own pass.** Hire a second cook, and they
+  bring a second counter with its own numbering. Two different dishes can both
   be "#1", and [a glance](story.md#wait) at one counter never sees the
   other's dishes.
 
-- **The waiter's own ingredients have no way in.** Something the waiter
-  already holds — a delivery that just arrived — can only reach the
-  orders by being copied into every slip, or by being handed to a cook as
-  a pretend order and waiting its turn in line.
+- **The waiter's own ingredients have no way in.** Take something the
+  waiter already holds, like a delivery that just arrived. It can reach the
+  orders only by being copied into every slip, or by being handed to a cook
+  as a pretend order and waiting its turn in line.
 
-Section A lets every task and your program look into the pot where it
-stands, instead of ladling out a copy. Section B gives the whole kitchen one pass. Section C
-lets the waiter stock the pantry directly.
+Section A lets every task, and your program, look into the pot where it
+stands instead of ladling out a copy. Section B gives the whole kitchen
+one pass. Section C lets the waiter stock the pantry directly.
 
 ## 4. Mental model
 
@@ -162,21 +163,21 @@ Walk the kitchen, one station per section:
 
 - **The pantry (section A).** Look closer at a spot on the pass: it never
   held the result itself. Since Day 2, every finished result has sat, as
-  one pot, in exactly one place — call it the pantry — and its spot on the
-  pass holds only a *label* saying where the pot stands. Collecting with `get` was a ladle: the kitchen
-  filled a brand-new pot for you and handed it over. Today's `read` hands
-  you another label instead. Any number of labels can point at the same
+  one pot, in exactly one place. Call that place the pantry. The result's
+  spot on the pass holds only a *label* saying where the pot stands.
+  Collecting with `get` was a ladle: the kitchen filled a brand-new pot for
+  you and handed it over. Today's `read` hands you another label instead. Any number of labels can point at the same
   pot, and the pot stays until the last label is gone.
 
 - **One pass for the whole kitchen (section B).** The pass belongs to the
-  kitchen, not to one cook. Every cook files results on it, every pot gets
-  a number nobody else has, and a glance at the pass sees them all.
+  kitchen, not to one cook. Every cook files results on it, and every pot
+  gets a number nobody else has. A glance at the pass sees them all.
 
 - **The waiter stocks the pantry (section C).** The waiter carries a
-  delivery straight into the pantry and gets a ticket for it on the spot —
-  no slip, no cook, no queue. And everything in the pantry is **sealed**:
-  readers look, nobody changes it. That rule is what makes sharing safe:
-  a pot that never changes can be read by any number of cooks at once,
+  delivery straight into the pantry and gets a ticket for it on the spot,
+  with no slip, no cook and no queue. And everything in the pantry is
+  **sealed**: readers look, and nobody changes it. That rule makes sharing
+  safe. Any number of cooks can read a pot that never changes at once,
   with nobody waiting for anybody.
 
 ```text
@@ -192,9 +193,9 @@ the stock, made once                the same 64 MiB, untouched
 one more label for each reader      a pointer to the same pot (8 readers: 0 MiB)
 ```
 
-Read each flow top to bottom: the left column is what happens to the
-stock, the right column says what it costs. The two flows start from the
-same pot; only the first one ever fills a second.
+Read each flow top to bottom. The left column is what happens to the
+stock, and the right column says what it costs. The two flows start from
+the same pot, but only the first one ever fills a second.
 
 ## 5. Ray concepts introduced
 
@@ -207,20 +208,20 @@ same pot; only the first one ever fills a second.
   names, two parts — never two names for one part.
 
 - **Zero-copy reads.** In Ray, `ray.get` of a NumPy array returns an array
-  *backed by the object store's memory* — no copy, and read-only. Today's
-  `Ticket::read` does the same: it returns an `Arc<T>`, a shared pointer
-  to the one stored value, and through it you can only read.
+  *backed by the object store's memory*, with no copy, and read-only.
+  Today's `Ticket::read` does the same. It returns an `Arc<T>`, a shared
+  pointer to the one stored value, and through it you can only read.
 
 - **`ray.put(value)`** stores a value the program already has and returns
   an `ObjectRef` for it at once. Today's `put(&store, value)` is the same.
-  Results and put objects share one store and one numbering: a ticket is
+  Results and put objects share one store and one numbering. A ticket is
   a ticket, wherever the value came from.
 
 - **Pass the ref, not the value.** Ray's docs list two anti-patterns:
   passing the same large argument by value to many tasks, and closures
   that capture a large object. Both copy the value once per task. The fix
-  for both is to `put` it once and hand the tasks its ref — exactly what
-  you measure today.
+  for both is to `put` it once and hand the tasks its ref. That is exactly
+  what you measure today.
 
 - **One honest difference.** Ray's object store holds *bytes*, because
   Ray's workers are separate processes that cannot share a Rust (or
@@ -249,26 +250,26 @@ same pot; only the first one ever fills a second.
 <a href="https://doc.rust-lang.org/book/ch15-02-deref.html#implicit-deref-coercions-with-functions-and-methods">deref coercion (<code>&amp;Arc&lt;A&gt;</code> → <code>&amp;A</code>, Rust book)</a>
 </div>
 
-Your Day 2 pass already keeps each result exactly once — so why touch
-it? Because of what happens when someone *collects* a result. You cannot
-see memory being copied, so before changing anything, build a meter that
+Your Day 2 pass already keeps each result exactly once, so why touch it?
+Because of what happens when someone *collects* a result. You cannot see
+memory being copied. So before changing anything, build a meter that
 shows it.
 
 Every `Vec`, `String`, or `Box` your program makes asks one component
-for its memory: the *allocator*. Rust lets a program swap in its own. Ours
-will pass every request straight to the system's allocator — and add the
-request's size to a running total first. This file is a measuring tool,
-not today's lesson: type it or copy it — it has to compile, and it exists
-so the demo can measure, not to test you. Two things in it deserve a
-sentence each:
+for its memory: the *allocator*. Rust lets a program swap in its own.
+Yours will pass every request straight to the system's allocator, after
+adding the request's size to a running total. This file is a measuring
+tool, not today's lesson, so type it or copy it. It has to compile, and it
+exists so the demo can measure, not to test you. Two things in it deserve
+a sentence each:
 
 - `#[global_allocator]` marks the one value that serves every allocation
   in the program, on every thread.
 
 - `unsafe` marks code where the compiler cannot check the rules for you.
   Handing out raw memory is such code, so the trait and its methods are
-  `unsafe`. Ours is sound for a simple reason: it never touches the
-  memory, it only forwards each call and counts.
+  `unsafe`. Yours is sound for a plain reason: it never touches the
+  memory. It only forwards each call and counts.
 
 Create `src/meter.rs`:
 
@@ -308,14 +309,14 @@ pub fn allocated() -> usize {
 ```
 
 `ALLOCATED` is a `static`: one value that lives as long as the program,
-shared by every thread — which is why it is an atomic, like Day 2's
+shared by every thread. That is why it is an atomic, like Day 2's
 `next_id`. And `*mut u8` is a *raw pointer*: a bare memory address that
-the compiler does not track, which is exactly what an allocator hands out.
+the compiler does not track. That is exactly what an allocator hands out.
 
 Now a demo that measures. Replace `src/main.rs` with the version below.
 It builds one 64 MiB value with a task, collects it with `get`, then
-feeds it to eight tasks with Day 2's `submit_with` — and prints the time
-and the fresh memory each step cost:
+feeds it to eight tasks with Day 2's `submit_with`. It prints the time and
+the fresh memory each step cost:
 
 ```rust,ignore
 mod meter;
@@ -399,11 +400,11 @@ A few details:
 
 - Each task returns `address(&bytes)`: *where* in memory the bytes it
   looked at live. `bytes.as_ptr()` is that location, and `as usize` turns
-  it into a plain number we can compare. Two equal addresses mean the very
-  same bytes; a copy always lives somewhere else.
+  it into a plain number you can compare. Two equal addresses mean the
+  very same bytes, and a copy always lives somewhere else.
 
-- `start_measuring` notes the meter and the clock; `cost` reports how much
-  of each passed since. The two numbers belong together, so they travel
+- `start_measuring` notes the meter and the clock, and `cost` reports how
+  much of each passed since. The two numbers belong together, so they travel
   as one pair. In `format!("{ms:.1} ms, …")`, the `:.1` prints one digit
   after the decimal point.
 
@@ -418,24 +419,24 @@ get #1                    -> 64 MiB of bytes: 4.9 ms, 64.0 MiB allocated
 Read it line by line:
 
 - `submit make_stock -> ticket #1, ready: true` — the cook makes the pot
-  of stock. `wait` with a 60 s limit held the waiter until it landed, so
-  that making it is not counted below.
+  of stock. `wait` with a 60 s limit held the waiter until the pot landed,
+  so making it is not counted below.
 
 - `get #1 -> 64 MiB of bytes: … 64.0 MiB allocated` — collecting it once
   filled a whole new 64 MiB pot. `Ticket::get` did that.
 
-- `8 tasks, submit_with -> 8 done: … 512.0 MiB allocated` — eight slips,
-  eight fresh pots. Each task only reads an address, yet every one of them
-  first got a full private copy.
+- `8 tasks, submit_with -> 8 done: … 512.0 MiB allocated` — eight slips
+  filled eight fresh pots. Each task only reads an address, yet every one
+  of them first got a full private copy.
 
-Where does the copy happen? Not on the pass. Look at Day 2's `get`: the
-pass handed it an `Arc` — a shared pointer to the one stored value — and
-then the last line did `value.clone()`. That clone is the ladle. And
-Day 2's `submit_with` called `get` once for every task it fed.
+Where does the copy happen? Not on the pass. Look at Day 2's `get`. The
+pass handed it an `Arc`, a shared pointer to the one stored value. Then
+the last line did `value.clone()`. That clone is the ladle. And Day 2's
+`submit_with` called `get` once for every task it fed.
 
 So the fix is small: hand out the shared pointer itself. Cloning an `Arc`
-copies a pointer and bumps a count; the value stays where it is. Two
-edits to `src/ticket.rs`, in order:
+copies a pointer and bumps a count, and the value stays where it is. Make
+two edits to `src/ticket.rs`, in order:
 
 1. Delete the `#[derive(Clone)]` line above `pub struct Ticket<T>`
    (around line 132). You will write `Clone` by hand in the next step.
@@ -485,20 +486,20 @@ Three details carry the change:
 
 - `read` uses `downcast::<T>()` where Day 2 used `downcast_ref::<T>()`.
   `downcast_ref` lends you a `&T` that is only valid while you hold the
-  box; `downcast` turns the shared box itself into an `Arc<T>`, which you
+  box. `downcast` turns the shared box itself into an `Arc<T>`, which you
   may keep as long as you like. No `T` is copied either way.
 
 - `get` is now "read, then copy." It writes `T::clone(&shared)` on
-  purpose: `shared.clone()` would clone the *`Arc`* — one more label, no
-  copy — and hand back the wrong type. `T::clone` says "copy the value
-  itself." `get` keeps its `where T: Clone` bound; `read` needs none,
+  purpose. `shared.clone()` would clone the *`Arc`* (one more label, no
+  copy) and hand back the wrong type. `T::clone` says "copy the value
+  itself." `get` keeps its `where T: Clone` bound. `read` needs none,
   because it never copies.
 
 - Why write `Clone` by hand? `#[derive(Clone)]` adds a hidden rule: "a
   `Ticket<T>` can be cloned only if `T` can be." That rule was harmless on
   Day 2, but the next edit must copy tickets for values that cannot be
-  copied. Copying a ticket copies a number and a pointer, never a `T` —
-  so the hand-written version has no such rule.
+  copied. Copying a ticket copies a number and a pointer, never a `T`. So
+  the hand-written version has no such rule.
 
 Now the worker's side. In `src/worker.rs`, replace the whole
 `submit_with` method (around line 62, doc comment included) with these
@@ -554,20 +555,20 @@ two methods:
 
 - The job calls `read` instead of `get`.
 
-- It calls `task(&value)`, handing the task a *shared reference* — an
-  `&A` — to the stored value. A shared reference lets the task look,
+- It calls `task(&value)`, handing the task a *shared reference* (an
+  `&A`) to the stored value. A shared reference lets the task look,
   never change, and never keep the value past the call.
 
 `value` itself is an `Arc<A>`. Writing `&value` where an `&A` is expected
-works because an `Arc` hands out a reference to what it points at; Rust
+works because an `Arc` hands out a reference to what it points at. Rust
 inserts that step for you (*deref coercion*).
 
 `submit_with` keeps its name and behavior and shrinks to one line:
 "read in place, and give the task its own copy of what you read." All of
 Day 2's `submit_with` tests now run through `submit_reading`, unchanged.
 
-Last, finish the demo. In `src/main.rs`, two insertions — the `⋮` and the
-framing lines are already in your file:
+Last, finish the demo. Make two insertions in `src/main.rs`. The `⋮` and
+the framing lines are already in your file:
 
 ```rust,ignore
 fn one_cook_copies_or_shares() {
@@ -610,7 +611,7 @@ fn how_many_saw(tasks: &[Ticket<usize>], home: usize) -> usize {
 
 `how_many_saw` counts the tasks whose reported address equals `home`,
 the stored value's own address. `matches!(…, Ok(seen) if seen == home)`
-is the `matches!` you met on Day 2 with one addition: a pattern may end
+is the `matches!` you met on Day 2, with one addition. A pattern may end
 in `if …`, and then it only matches when that condition holds too.
 
 `cargo run`:
@@ -632,18 +633,18 @@ Read the new lines one by one:
   `Arc<Vec<u8>>` pointing at the stored bytes.
 
 - `8 tasks, submit_reading -> 8 done: 0.0 ms, 0.0 MiB allocated` — eight
-  tasks, zero pots. Each one borrowed the stored value through
+  tasks filled zero pots. Each one borrowed the stored value through
   `submit_reading`. (A few hundred bytes for slips and tickets do get
-  allocated; they round to 0.0.)
+  allocated, but they round to 0.0.)
 
-- `saw #1's own bytes -> copies: 0 of 8, readers: 8 of 8` — the proof:
-  none of the `submit_with` tasks looked at the stored bytes, all eight
-  `submit_reading` tasks did. `how_many_saw` compared each reported
+- `saw #1's own bytes -> copies: 0 of 8, readers: 8 of 8` — here is the
+  proof. None of the `submit_with` tasks looked at the stored bytes, but
+  all eight `submit_reading` tasks did. `how_many_saw` compared each reported
   address with the address of `shared`.
 
-Your timings will differ — mine wobble between about 4 and 8 ms for
-`get` and 10 and 16 ms for the eight copies. The memory column is the
-same on every run: the meter counts requests, not luck.
+Your timings will differ. Mine wobble between about 4 and 8 ms for `get`,
+and between 10 and 16 ms for the eight copies. The memory column is the
+same on every run, because the meter counts requests, not luck.
 
 Five tests pin today's behavior. First, append the meter's own test to
 the end of `src/meter.rs`, after the closing brace of `allocated`:
@@ -665,11 +666,11 @@ mod tests {
 // ──────── new code ends here ────────
 ```
 
-`1 << 20` is 2 to the power 20 — 1,048,576 bytes, exactly 1 MiB. Tests
+`1 << 20` is 2 to the power 20: 1,048,576 bytes, exactly 1 MiB. Tests
 run in parallel, and all of them share the one global meter. So this test
 can only promise a lower bound: "at least my 1 MiB was counted."
 
-Then, in `src/ticket.rs`, add a test at the end of `mod tests`, just
+Then, in `src/ticket.rs`, add a test at the end of `mod tests`, right
 before the file's final closing `}`:
 
 ```rust,ignore
@@ -695,7 +696,7 @@ mod tests {
 ```
 
 `Arc::ptr_eq(&first, &second)` is `true` when two `Arc`s point at the
-same value — two labels, one pot.
+same value: two labels, one pot.
 
 And in `src/worker.rs`, add one helper and three tests at the end of
 `mod tests`, before the file's final closing `}`:
@@ -749,7 +750,7 @@ mod tests {
 }
 ```
 
-The third test is the reason `Clone` became hand-written: a `Recipe`
+The third test is the reason `Clone` became hand-written. A `Recipe`
 cannot be copied at all, yet tasks can still read it in place.
 
 ```bash
@@ -802,14 +803,14 @@ ones.
 <a href="https://google.github.io/comprehensive-rust/tuples-and-arrays/arrays.html">arrays (<code>[a, b]</code>)</a>
 </div>
 
-Your section A reads are free. But one cook means one slip at a time: a
-slow dish holds up everything behind it. The obvious fix is a second
-cook. Watch what happens. Two edits to `src/main.rs`. The first stays;
-the second is a temporary experiment you'll delete in a minute:
+Your section A reads are free. But one cook means one slip at a time, so
+a slow dish holds up everything behind it. The obvious fix is a second
+cook. Watch what happens. Make two edits to `src/main.rs`. The first
+stays, and the second is a temporary experiment you'll delete in a minute:
 
 1. Add `use std::thread;` above the `use std::time::…` line.
 
-2. Add these lines at the end of `main` — the framing lines are already
+2. Add these lines at the end of `main`. The framing lines are already
    in your file:
 
    ```rust,ignore
@@ -858,19 +859,19 @@ worker-2's dish, alone    -> ready: false
 Read the last four lines:
 
 - `worker-1's quick dish -> ticket #1` and `worker-2's slow dish -> ticket
-  #1` — two different dishes, the same number. Each `Worker::start` made
-  its cook a brand-new pass, and each pass counts from 1.
+  #1` — two different dishes get the same number. Each `Worker::start`
+  made its cook a brand-new pass, and each pass counts from 1.
 
-- `wait for both, max 5 s -> 2 ready after 0 ms` — wrong. The slow dish
-  needs a full second. `wait` looks on the *first* ticket's pass only, and
-  on worker-1's pass, number #1 is indeed ready — twice. Day 2's `wait`
-  promised only that all tickets come from the same worker; we just broke
-  that promise.
+- `wait for both, max 5 s -> 2 ready after 0 ms` — this is wrong. The
+  slow dish needs a full second. `wait` looks on the *first* ticket's pass
+  only, and on worker-1's pass, number #1 is indeed ready — twice. Day 2's
+  `wait` promised only that all tickets come from the same worker, and
+  this demo broke that promise.
 
 - `worker-2's dish, alone -> ready: false` — asked on its own pass, the
-  slow dish is honestly not ready. Same question, two answers.
+  slow dish is honestly not ready. The same question got two answers.
 
-The fix is to stop giving every cook its own pass: a kitchen has one
+The fix is to stop giving every cook its own pass. A kitchen has one
 pass, and every cook puts dishes on it. Delete those temporary lines
 from `main` (keep `use std::thread;`), then make two edits to
 `src/worker.rs`:
@@ -903,23 +904,23 @@ from `main` (keep `use std::thread;`), then make two edits to
                store: Arc::clone(store),
    ```
 
-`start` keeps its old behavior — one cook, a pass of its own — by asking
-`start_in` for exactly that, so all of Day 1 and Day 2's code is
-untouched. `start_in` takes the pass as `&Arc<MemoryStore>`: it borrows
-your handle and keeps an `Arc::clone` of it, one more handle on the same
+`start` keeps its old behavior (one cook, a pass of its own) by asking
+`start_in` for exactly that. So all of Day 1 and Day 2's code is
+untouched. `start_in` takes the pass as `&Arc<MemoryStore>`. It borrows
+your handle and keeps an `Arc::clone` of it: one more handle on the same
 shared pass.
 
-One doc comment is now out of date: in `src/ticket.rs`, the doc of
+One doc comment is now out of date. In `src/ticket.rs`, the doc of
 `pub fn wait` (around line 196) ends "All tickets must come from the same
-worker." Change `worker` to `store` (in code, the pass is a store) — it
-was always the pass that mattered.
+worker." Change `worker` to `store` (in code, the pass is a store). It was
+always the pass that mattered.
 
-Now the demo. Three edits to `src/main.rs`:
+Now the demo. Make three edits to `src/main.rs`:
 
 1. Import the pass type: change `use ticket::{Ticket, wait};` to
    `use ticket::{MemoryStore, Ticket, wait};`.
 
-2. Call the new scene: add `two_cooks_one_pass();` as the last line of
+2. Call the new scene. Add `two_cooks_one_pass();` as the last line of
    `main`.
 
 3. After the closing brace of `how_many_saw` (around line 85), add the
@@ -979,7 +980,7 @@ Now the demo. Three edits to `src/main.rs`:
 
 `let cooks = [ … ];` is an *array*: a fixed-size list, here of exactly two
 workers, reached as `cooks[0]` and `cooks[1]`. `cook_name` reads the
-current thread's name — inside a task, that is the name of the cook
+current thread's name. Inside a task, that is the name of the cook
 running it.
 
 `cargo run`:
@@ -1002,21 +1003,21 @@ worker-2 reads #3         -> #3's own bytes: true, 0.0 ms, 0.0 MiB allocated
 Read the new lines one by one:
 
 - `worker-1's quick dish -> ticket #1`, `worker-2's slow dish -> ticket
-  #2` — one pass, one numbering. Both cooks' slips drew their numbers
-  from the same `new_id` counter.
+  #2` — one pass gives one numbering. Both cooks' slips drew their
+  numbers from the same `new_id` counter.
 
-- `wait for both, max 5 s -> 2 ready after about 1000 ms` — now honest:
-  `wait` finds both numbers on the one pass, and returns when the slow
+- `wait for both, max 5 s -> 2 ready after about 1000 ms` — now `wait` is
+  honest. It finds both numbers on the one pass, and returns when the slow
   dish lands.
 
 - `worker-1 makes the stock -> ticket #3` — one cook makes the 64 MiB.
 
 - `worker-2 reads #3 -> #3's own bytes: true, … 0.0 MiB allocated` — the
   *other* cook reads it in place. `cook_name` proved which cook ran the
-  task, and the address proved it looked at #3's own bytes. One pass, one
-  pantry behind it — every cook reads every dish.
+  task, and the address proved it looked at #3's own bytes. With one pass
+  and one pantry behind it, every cook reads every dish.
 
-Three tests pin it. In `src/worker.rs`'s `mod tests`:
+Three tests pin this behavior. In `src/worker.rs`'s `mod tests`:
 
 1. Change `use crate::ticket::{MemoryStore, Ticket};` (around line 202) to
    `use crate::ticket::{MemoryStore, Ticket, wait};`.
@@ -1082,8 +1083,8 @@ Three tests pin it. In `src/worker.rs`'s `mod tests`:
 
 All three use workers started on one shared pass.
 `wait_sees_results_from_every_worker_on_the_store` uses a gate, as on
-Day 2: worker-2's dish provably cannot be ready, so exactly one of the two
-tickets may be — the bug you watched a moment ago would report two.
+Day 2. Worker-2's dish provably cannot be ready, so exactly one of the two
+tickets may be. The bug you watched a moment ago would report two.
 
 ```bash
 cargo test
@@ -1138,9 +1139,9 @@ All 29 earlier tests pass, plus the three new ones.
 </div>
 
 Every value in the pantry so far was made by a cook. But often the
-waiter already holds the big value — a file it read, a table it built, a
-delivery that just arrived. How does it reach the tasks? Try the two ways
-you have. Add these lines at the end of `main`, temporarily — the
+waiter already holds the big value: a file it read, a table it built, a
+delivery that just arrived. How does that value reach the tasks? Try the
+two ways you have. Add these lines at the end of `main`, temporarily. The
 framing lines are already in your file:
 
 ```rust,ignore
@@ -1179,10 +1180,10 @@ fn main() {
 }
 ```
 
-Two small marks in there: `_busy` starts with an underscore to tell Rust
-"I keep this ticket on purpose, without reading it", and `let _ =
-stocked.read();` waits for the value and throws the result away — only
-the waiting matters here.
+Two small marks sit in there. `_busy` starts with an underscore to tell
+Rust "I keep this ticket on purpose, without reading it." And `let _ =
+stocked.read();` waits for the value and throws the result away, because
+only the waiting matters here.
 
 `cargo run`:
 
@@ -1207,23 +1208,24 @@ ready after about         -> 300 ms
 Read it line by line:
 
 - `8 tasks, a clone each -> … 512.0 MiB allocated` — each closure needs
-  its own value to `move` in, so each got a `delivery.clone()`. Section
-  A's 512 MiB again, this time made on the waiter's side.
+  its own value to `move` in, so each got a `delivery.clone()`. That is
+  section A's 512 MiB again, this time made on the waiter's side.
 
 - `delivery through the cook -> ticket #10, ready: false` — dressing the
   delivery up as an order slip avoids the copies, but now it waits in
-  line: the cook is busy for 300 ms, and the "order" (hand the delivery
-  back) sits on the rail behind it. (Number #10, because `worker-3` has a
-  pass of its own: the eight tasks took #1 to #8, the 300 ms slip #9.)
+  line. The cook is busy for 300 ms, and the "order" (hand the delivery
+  back) sits on the rail behind that slip. (It is number #10 because
+  `worker-3` has a pass of its own. The eight tasks took #1 to #8, and the
+  300 ms slip took #9.)
 
 - `ready after about -> 300 ms` — `stocked.read()` blocked for the cook's
-  300 ms slip: a value the waiter held the whole time only became
+  300 ms slip. A value the waiter held the whole time only became
   readable once the cook got around to it.
 
 Ray's docs list both moves as anti-patterns. The fix is a way in that
-needs no cook at all: the waiter carries the value straight into the
+needs no cook at all. The waiter carries the value straight into the
 pantry and gets a ticket on the spot. Delete the temporary lines, then
-make one edit to `src/ticket.rs`: after the closing brace of `pub fn
+make one edit to `src/ticket.rs`. After the closing brace of `pub fn
 wait` and before `#[cfg(test)]` (around line 222), add:
 
 ```rust,ignore
@@ -1245,18 +1247,18 @@ pub fn put<T: Send + Sync + 'static>(store: &Arc<MemoryStore>, value: T) -> Tick
 Two notes:
 
 - There are now two `put`s, and they do different jobs.
-  `MemoryStore::put(id, outcome)` is Day 2's: it fills a spot whose number
-  someone already holds — [the cook's stub](story.md#stub) uses it. The
-  new free function `put(&store, value)` is Ray's `ray.put`: it picks a
+  `MemoryStore::put(id, outcome)` is Day 2's. It fills a spot whose number
+  someone already holds, and [the cook's stub](story.md#stub) uses it. The
+  new free function `put(&store, value)` is Ray's `ray.put`. It picks a
   fresh number itself, fills the spot, and hands back the ticket. It is
   built from the first.
 
-- `value: T` is taken *by value* — moved in, not copied. For a `Vec`,
-  moving copies only its small header (where the bytes are, how many);
-  the 64 MiB of bytes never move. `Arc::new` then wraps that header in a
+- `value: T` is taken *by value*: moved in, not copied. For a `Vec`,
+  moving copies only its small header (where the bytes are, how many).
+  The 64 MiB of bytes never move. `Arc::new` then wraps that header in a
   shared box. The waiter's original bytes become the pantry's bytes.
 
-Now the scene. Three edits to `src/main.rs`:
+Now the scene. Make three edits to `src/main.rs`:
 
 1. Change `use ticket::{MemoryStore, Ticket, wait};` to
    `use ticket::{MemoryStore, Ticket, put, wait};`.
@@ -1313,7 +1315,7 @@ Now the scene. Three edits to `src/main.rs`:
    ```
 
 `cooks[n % 2]` hands the eight readers to the two cooks in turn (`%` is
-the remainder: 0, 1, 0, 1, …). Choosing a cook by hand is clumsy — on
+the remainder: 0, 1, 0, 1, …). Choosing a cook by hand is clumsy, and on
 Day 4 a scheduler takes that job over.
 
 `cargo run`:
@@ -1346,18 +1348,19 @@ Read the new lines one by one:
 - `put the delivery -> ticket #3, ready: true, 0.0 ms, 0.0 MiB allocated`
   — the waiter stocks the pantry. `put` drew number #3 from the same
   counter the cooks use, stored the value, and returned a ticket that is
-  ready at once: no cook, no copy.
+  ready at once. There was no cook and no copy.
 
-- `cooks finished yet? -> 0 of 2` — proof that `put` did not wait for a
-  cook: they are both still busy.
+- `cooks finished yet? -> 0 of 2` — this proves that `put` did not wait
+  for a cook, because both cooks are still busy.
 
 - `8 tasks on 2 cooks -> 8 done: 303.5 ms, 0.0 MiB allocated` — the
-  readers wait their turn behind the slow slips (about 300 ms — both cooks
-  work at the same time), then read the delivery in place.
+  readers wait their turn behind the slow slips, then read the delivery in
+  place. The wait is about 300 ms, because both cooks work at the same
+  time.
 
 - `saw the delivery's bytes -> 8 of 8` — every reader looked at the very
-  bytes the waiter made before calling `put`. Put in once, read by
-  everyone, copied never.
+  bytes the waiter made before calling `put`. The value was put in once,
+  read by everyone, and never copied.
 
 **Why sealed?** Everything in the pantry is read-only, for every reader.
 See what happens if a reader tries to change the pot. Temporarily change
@@ -1390,8 +1393,8 @@ For more information about this error, try `rustc --explain E0596`.
 error: could not compile `nano-ray-rs` (bin "nano-ray-rs") due to 1 previous error
 ```
 
-The compiler's hint suggests `&mut Vec<u8>`. Follow it, and it refuses
-again — this time pointing at `submit_reading` itself:
+The compiler's hint suggests `&mut Vec<u8>`. Follow it, and the compiler
+refuses again. This time it points at `submit_reading` itself:
 
 ```text
 error[E0631]: type mismatch in closure arguments
@@ -1419,25 +1422,25 @@ error: could not compile `nano-ray-rs` (bin "nano-ray-rs") due to 1 previous err
 
 `&T` is a *shared* reference: many may exist at once, and none may
 change the value. `&mut T` is an *exclusive* reference: it may change
-the value, but only while no one else can see it. A pantry pot is seen by
-everyone, so exclusive access is impossible by construction, and
-`submit_reading`'s promise — `FnOnce(&A)` — is enforced on every task.
-Put the closure back.
+the value, but only while no one else can see it. Everyone sees a pantry
+pot, so exclusive access is impossible by construction. The compiler
+enforces `submit_reading`'s promise, `FnOnce(&A)`, on every task. Put the
+closure back.
 
-That refusal is the whole safety story of the pantry. Because a stored
-value never changes:
+That refusal is the whole safety story of the pantry. A stored value
+never changes, and that gives you three things:
 
 - **Readers need no lock.** The pass's `Mutex` is held only for the
-  moment it takes to find a label; the reading itself happens with no
+  moment it takes to find a label. The reading itself happens with no
   lock at all, on as many threads as you like.
 
 - **Nobody can read a half-changed value**, and nobody's answer changes
   under them.
 
-- **A copy can never go stale** — which will matter on Day 9, when other
+- **A copy can never go stale.** That will matter on Day 9, when other
   machines keep copies of pantry values.
 
-If a task wants a changed version, it makes a new value and returns it —
+If a task wants a changed version, it makes a new value and returns it:
 a new dish, under a new number. The old one stays exactly as it was.
 
 Five tests pin `put`. In `src/ticket.rs`'s `mod tests`:
@@ -1529,7 +1532,7 @@ And in `src/worker.rs`'s `mod tests`:
    ```
 
 None of them measure time. `put_moves_the_value_in_without_copying_it`
-compares addresses, the same proof the demo prints, and
+compares addresses, the same proof the demo prints.
 `put_does_not_wait_for_a_busy_worker` keeps the worker provably busy
 behind a gate while it checks that the put value is ready.
 
@@ -1609,31 +1612,32 @@ saw the delivery's bytes  -> 8 of 8
 The whole evening in the kitchen, one stretch at a time:
 
 - The first six lines — one cook, one pot of stock. Ladling it out (`get`,
-  `submit_with`) fills a fresh 64 MiB pot every time; reading it in place
+  `submit_with`) fills a fresh 64 MiB pot every time. Reading it in place
   (`read`, `submit_reading`) costs nothing, and every reader sees the
   stock's own bytes.
 
-- The next five — two cooks on one pass. One numbering, an honest `wait`,
-  and one cook reading the other's dish in place. (`Worker::start_in`.)
+- The next five — two cooks on one pass. They share one numbering and an
+  honest `wait`, and one cook reads the other's dish in place.
+  (`Worker::start_in`.)
 
 - The last five — the waiter stocks the pantry with `put` while both
-  cooks are busy: ready at once, nothing copied, and eight readers on two
-  cooks see the waiter's own bytes.
+  cooks are busy. The value is ready at once and nothing is copied. Eight
+  readers on two cooks see the waiter's own bytes.
 
-What varies between runs: the millisecond figures (rounded only in the
-`about 1000 ms` line). Everything else — every ticket number, every
-`MiB allocated`, every count — is the same on every run. (One honest
-caveat, as on Day 2: two demo lines rely on timing — `cooks finished
+Only the millisecond figures vary between runs, and only the
+`about 1000 ms` line rounds them. Everything else is the same on every
+run: every ticket number, every `MiB allocated`, every count. (One honest
+caveat, as on Day 2: two demo lines rely on timing. `cooks finished
 yet? -> 0 of 2` assumes `put` takes less than the cooks' 300 ms, and the
 slow dish's 1 s keeps `wait` visibly waiting. The tests rely on gates
 instead.)
 
 ## 9. Test it
 
-Thirty-seven tests now pin the engine — Day 2's 24, plus 13 new ones
-today: the meter, shared reads and the copy they replace (section A, 5
-tests), several workers on one store (section B, 3), and `put` (section
-C, 5):
+Thirty-seven tests now pin the engine: Day 2's 24, plus 13 new ones
+today. Section A's 5 pin the meter, shared reads and the copy they
+replace. Section B's 3 pin several workers on one store. Section C's 5
+pin `put`:
 
 ```bash
 cargo test
@@ -1682,7 +1686,7 @@ test ticket::tests::wait_gives_up_when_the_timeout_runs_out ... ok
 test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 ```
 
-(All 37 are unit tests; the program still takes no command-line input,
+(All 37 are unit tests. The program still takes no command-line input,
 so there is nothing for a command-line test to drive.)
 
 ## 10. Break it deliberately
@@ -1695,9 +1699,9 @@ Give every cook a private pass again. In `Worker::start_in` in
 +            store: MemoryStore::new(),
 ```
 
-It compiles, with one warning: `unused variable: store` — the shared pass
+It compiles, with one warning: `unused variable: store`. The shared pass
 handed to `start_in` is now ignored. `cargo run` finishes, and nothing
-crashes, but read the second half closely (the whole output, warning
+crashes. But read the second half closely (the whole output, warning
 excluded):
 
 ```text
@@ -1722,19 +1726,20 @@ saw the delivery's bytes  -> 8 of 8
 Read it as a list of lies:
 
 - `ticket #1` twice, then `2 ready after about 0 ms` — section B's bug is
-  back: two dishes share a number, and `wait` believes the slow one is
+  back. Two dishes share a number, and `wait` believes the slow one is
   done.
 
-- `worker-2 reads #2 -> …, 1009.5 ms` — and here is the price of that
+- `worker-2 reads #2 -> …, 1009.5 ms` — here is the price of that
   lie. The program moved on while worker-2 was still cooking its slow
   dish, so the read had to queue behind it for a full second.
 
 - `tickets #1 and #1`, then `put the delivery -> ticket #1` — the waiter's
-  delivery got number #1 too: three different values, one number.
+  delivery got number #1 too. Three different values share one number.
 
-- The last two lines look right, and that is the scariest part: `wait`
+- The last two lines look right, and that is the scariest part. `wait`
   checked the readers' numbers on worker-1's pass, where *other* dishes
-  with the same numbers happened to be ready. Correct by coincidence.
+  with the same numbers happened to be ready. They are correct only by
+  coincidence.
 
 `cargo test` is blunter (lines trimmed to the interesting ones):
 
@@ -1775,15 +1780,16 @@ test result: FAILED. 34 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out;
 
 - `workers_on_one_store_share_one_numbering` and
   `put_values_and_task_results_share_one_numbering` catch the duplicate
-  numbers: `["#1", "#1", "#2"]` where `["#1", "#2", "#3"]` belongs.
+  numbers. They see `["#1", "#1", "#2"]` where `["#1", "#2", "#3"]`
+  belongs.
 
 - `wait_sees_results_from_every_worker_on_the_store` catches the lying
   glance: two tickets ready where only one can be. (The extra `worker-2`
-  panic is that test's gated task: the failed test dropped the gate's
-  other end, so its `recv` found no sender.)
+  panic comes from that test's gated task. The failed test dropped the
+  gate's other end, so the task's `recv` found no sender.)
 
 The lesson: **a ticket number means something only inside one store.**
-Ray faces the same rule at the scale of a cluster — its object ids are
+Ray faces the same rule at the scale of a cluster. Its object ids are
 unique everywhere, so a ref can be handed to any worker on any machine
 and still name exactly one object.
 
@@ -1827,28 +1833,28 @@ git diff v1-day-02 v1-day-03
 
 **What changed today:** a meter now counts every byte of fresh memory,
 and it showed what Day 2's collection really cost: a full copy per
-reader. `Ticket::read` hands out the stored value itself — an `Arc`, one
-more label on one pot — and `submit_reading` lends it to a task as a
-read-only `&A`; `get` and `submit_with` became "read, then copy." Workers
-started with `Worker::start_in` share one pass, so they share one
+reader. `Ticket::read` hands out the stored value itself, as an `Arc`:
+one more label on one pot. `submit_reading` lends that value to a task as
+a read-only `&A`. `get` and `submit_with` became "read, then copy."
+Workers started with `Worker::start_in` share one pass, so they share one
 numbering, one place to `wait`, and each other's results. `put` stores a
-value the program already holds — ready at once, moved in, never copied.
+value the program already holds: ready at once, moved in, never copied.
 And the compiler keeps every stored value sealed. Thirteen new tests (37
 in all) pin it across three section checkpoints (`v1-day-03a`,
 `v1-day-03b`, `v1-day-03c`), still with no dependencies.
 
-**Deliberately naive:** nothing is ever removed — in a long-running
+**Deliberately naive:** nothing is ever removed. In a long-running
 program the pass only grows, and so does the pantry behind it, and nobody
-yet knows when a value is safe to delete; the pantry holds Rust values, not bytes, so it
-can only be shared by threads of one program; you pick a cook for every
-task by hand; and each cook still has a rail of its own, so a slip waits
-behind its own cook's queue even when the other cook is idle.
+yet knows when a value is safe to delete. The pantry holds Rust values,
+not bytes, so only threads of one program can share it. You pick a cook
+for every task by hand. And each cook still has a rail of its own, so a
+slip waits behind its own cook's queue even when the other cook is idle.
 
 **Tomorrow's limitation, resolved on Day 4:** two cooks, two rails, and
 you choosing the cook for every slip. On Day 4 the kitchen gets a pool of
 cooks behind **one** queue, and a scheduler that hands each slip to
-whichever cook is free — and you will measure a slow job dropping to a
-bit more than a quarter of its time. Today's pantry is what lets all those cooks share
-their inputs without copying them. Tonight the kitchen closes with one
+whichever cook is free. You will measure a slow job dropping to a bit
+more than a quarter of its time. Today's pantry is what lets all those
+cooks share their inputs without copying them. Tonight the kitchen closes with one
 pass, one pantry, and a waiter who can stock it — see
 [the restaurant](story.md).

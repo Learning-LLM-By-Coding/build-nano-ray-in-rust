@@ -53,10 +53,10 @@ someone else.
 
 - **hand a ticket to the next task as its input**, before the first task
   has even finished. The engine itself holds the second task back until
-  its input exists, then runs it — and if the input crashed, the second
-  task never runs at all; it inherits the error.
+  its input exists, then runs it. If the input crashed, the second task
+  never runs at all. It inherits the error instead.
 
-That last move is how Ray chains work into pipelines: you describe the
+That last move is how Ray chains work into pipelines. You describe the
 whole chain up front, and the runtime runs each step the moment its input
 is ready.
 
@@ -72,7 +72,7 @@ is ready.
 
 A sneak peek at the end of the day — the exact output you will produce,
 with a plain-English note under each group of lines. If a note doesn't
-fully land yet, that's fine; the rest of the day builds every piece:
+fully land yet, that's fine. The rest of the day builds every piece:
 
 ```text
 submit slow_square(7) -> ticket #1
@@ -110,38 +110,38 @@ get ticket #11        -> error: task failed: the oven caught fire
 ```
 
 - The first four lines — a slow job is handed off and comes back as
-  number `#1`. A copy of the ticket carries the same number, and both
-  the original and the copy can be read: the answer, 49, is still there
-  the second time.
+  number `#1`. A copy of the ticket carries the same number, and you can
+  read both the original and the copy. The answer, 49, is still there the
+  second time.
 
 - The crash block and the two `try` lines — a job that crashes on purpose.
   Its failure is kept under its number too, so it reads the same both
   times.
 
 - `submit 3 orders` and the three `wait for` lines — three slow jobs at
-  once. The program asks "tell me when at least one is done": job `#3`
-  arrives after about 300 ms. Then "one more, but give up after 0.1 s":
-  nothing is done in time, so it gives up empty-handed. Then "both of the
-  rest": they arrive at about 900 ms.
+  once. First the program asks "tell me when at least one is done," and
+  job `#3` arrives after about 300 ms. Then it asks for "one more, but give
+  up after 0.1 s." Nothing is done in time, so it gives up empty-handed.
+  Last it asks for "both of the rest," and they arrive at about 900 ms.
 
 - `wait on the burnt one` — a crashed job counts as *finished*. Its
   answer is an error, but it is an answer.
 
 - `submit slow_square(3)` down to `is #6 ready yet? -> false` — four jobs
   handed off in a row. Three of them take *another job's number* as their
-  input — before that input exists, as the last line proves.
+  input. They do so before that input exists, as the last line proves.
 
 - The three indented `cook:` lines — the jobs that were waiting on an
-  input run as soon as it arrives. Notice the order: `times_ten` runs
-  before `double`, although `double` was handed off first, because
+  input run as soon as it arrives. Notice the order. `times_ten` runs
+  before `double`, although `double` was handed off first. That is because
   `double` needed `add_one`'s answer.
 
 - `get ticket #8 -> 20` and `get ticket #9 -> 90` — (3 × 3 + 1) × 2 = 20
   and 3 × 3 × 10 = 90.
 
 - The last five lines — a job that crashes, and a second job that needs
-  its answer. The second job never runs (no `cook: add_one` line appears);
-  its number receives the first job's error instead.
+  its answer. The second job never runs (no `cook: add_one` line appears).
+  Its number receives the first job's error instead.
 
 ## 3. Why we need it
 
@@ -154,17 +154,17 @@ comes back as a [note](story.md#task-error) instead of closing the
 kitchen.
 
 Today's scene: **the pass gets numbered spots.** Right now each dish
-travels to the waiter in a private envelope, and only the one ticket
-holder can open it, once. That is fine for one waiter collecting one
+travels to the waiter in a private envelope. Only the one ticket holder
+can open it, and only once. That is fine for one waiter collecting one
 dish. It fails the moment work starts to *connect*:
 
 - **A result needed in two places.** Two later orders both need the same
   sauce. With yesterday's ticket, whoever opens the envelope first takes
-  the sauce, and the second order has nothing to open.
+  the sauce. The second order has nothing left to open.
 
 - **Several dishes in the air.** The waiter has three tickets and wants
-  whichever dish is ready first — or to give up after a while and check
-  on the dining room. Yesterday's `get` can only stand at the counter
+  whichever dish is ready first. Or they want to give up after a while and
+  check on the dining room. Yesterday's `get` can only stand at the counter
   for one particular dish, for as long as it takes.
 
 - **An order that needs another dish.** The waiter wants to order "the
@@ -174,9 +174,9 @@ dish. It fails the moment work starts to *connect*:
 
 So today's three sections move the results *out* of the envelopes and
 onto the pass, under their ticket numbers. Section A builds the numbered
-pass and the copyable ticket, section B teaches the waiter to glance at
-the pass with a time limit, and section C lets an order slip wait clipped
-to the spot of the dish it needs.
+pass and the copyable ticket. Section B teaches the waiter to glance at
+the pass with a time limit. Section C lets an order slip wait, clipped to
+the spot of the dish it needs.
 
 ## 4. Mental model
 
@@ -184,17 +184,16 @@ Walk the counter, one station per section:
 
 - **Numbered spots on the pass (section A).** When the cook finishes a
   dish, it goes on the pass under its ticket number and *stays there*.
-  The ticket is no longer an envelope — it is a number, and anyone holding
+  The ticket is no longer an envelope. It is a number, and anyone holding
   a copy of the number can come and look. Looking doesn't remove the dish.
-  The pass has a **bell**: each time a dish lands, the cook rings it, and
-  everyone waiting at the counter checks whether their number came up.
+  The pass also has a **bell**. Each time a dish lands, the cook rings it,
+  and everyone waiting at the counter checks whether their number came up.
 
 - **The cook's stub (section A).** When a slip goes on the rail, the
-  cook keeps a stub with the same number. Whatever happens — the dish
-  cooks, burns, or the slip is thrown away unrun because the cook has
-  gone home — the stub guarantees
-  *something* lands on the pass under that number, so no waiter waits
-  forever.
+  cook keeps a stub with the same number. The dish may cook or burn, or
+  the slip may be thrown away unrun because the cook has gone home.
+  Whatever happens, the stub guarantees that *something* lands on the pass
+  under that number, so no waiter waits forever.
 
 - **A glance at the pass (section B).** The waiter holding three tickets
   stands at the pass for at most, say, five seconds, and leaves with
@@ -203,7 +202,7 @@ Walk the counter, one station per section:
 - **A slip that needs another dish (section C).** The pasta slip gets
   clipped to the *empty* spot where the sauce will land. When the sauce
   lands, the cook unclips the slip and pins it to the rail. If the sauce
-  burned instead, the pasta is never cooked: the burnt-dish note is
+  burned instead, the pasta is never cooked. The burnt-dish note is
   copied onto the pasta's spot.
 
 ```text
@@ -221,8 +220,8 @@ main (the waiter)                     the pass             worker-0 (the cook)
     │◀─── 10 ───────────────────────── (bell rings)            │
 ```
 
-Read the diagram top to bottom: time flows downward, the waiter is on
-the left, the cook on the right, and the pass sits between them.
+Read the diagram top to bottom, because time flows downward. The waiter
+is on the left, the cook on the right, and the pass sits between them.
 
 ## 5. Ray concepts introduced
 
@@ -233,23 +232,24 @@ the left, the cook on the right, and the pass sits between them.
   id, never the result.
 
 - **The in-process memory store.** Ray keeps small task results in a
-  table inside the process that submitted the task (larger ones go to the
-  shared-memory object store of Day 3). Today's `MemoryStore` is that
+  table inside the process that submitted the task. Larger ones go to the
+  shared-memory object store of Day 3. Today's `MemoryStore` is that
   table, named after it.
 
 - **`ray.get` reads, it doesn't take.** You can `ray.get` the same ref
-  many times; the object stays in the store. Today's `get(&self)` borrows
-  the ticket instead of consuming it.
+  many times, and the object stays in the store. Today's `get(&self)`
+  borrows the ticket instead of consuming it.
 
 - **`ray.wait(refs, num_returns, timeout)`** returns `(ready,
   not_ready)`: at least `num_returns` ready refs, unless the timeout runs
-  out first. Today's `wait` has the same shape, the same order-preserving
-  split, and also counts a failed task as ready. One difference: Ray's
-  timeout may be `None` ("wait forever"); ours is always a number.
+  out first. Today's `wait` has the same shape and the same
+  order-preserving split, and it also counts a failed task as ready. One
+  difference: Ray's timeout may be `None` ("wait forever"), but yours is
+  always a number.
 
-- **Passing refs into tasks.** `g.remote(f.remote())` passes the *ref*,
-  and Ray holds `g` back until the value exists, then calls `g` with the
-  value — `g` never sees a ref. Today's `submit_with` does the same for
+- **Passing refs into tasks.** `g.remote(f.remote())` passes the *ref*.
+  Ray holds `g` back until the value exists, then calls `g` with the
+  value, so `g` never sees a ref. Today's `submit_with` does the same for
   one input.
 
 - **Errors propagate.** If `f` failed, `g` does not run, and
@@ -284,8 +284,8 @@ second `get` right under the first one in Day 1's `main`:
     let again = ticket.get().expect("slow_square never fails");
 ```
 
-`cargo build` refuses (a warning about the unused `again` follows; it
-doesn't matter here):
+`cargo build` refuses. (A warning about the unused `again` follows, but
+it doesn't matter here.)
 
 ```text
 error[E0382]: use of moved value: `ticket`
@@ -307,9 +307,9 @@ note: `Ticket::<T>::get` takes ownership of the receiver `self`, which moves `ti
 ```
 
 Yesterday that was a feature: you cannot collect the same dish twice.
-But it is also a wall. The dish lives *inside* the ticket — in its
-private channel — so once you take it out, it is gone, and no copy of the
-ticket could ever exist to read it again. (Delete the extra line before
+But it is also a wall. The dish lives *inside* the ticket, in its private
+channel. Once you take the dish out, it is gone, and no copy of the ticket
+could ever exist to read it again. (Delete the extra line before
 moving on.)
 
 The fix is to separate the two things the ticket mixes up:
@@ -325,34 +325,35 @@ Two new tools make a table safe to share between threads, and one more
 lets a waiting thread sleep:
 
 - `Arc` ("atomically reference-counted") lets several owners hold the
-  *same* value. Cloning an `Arc` copies a pointer, never the value; the
+  *same* value. Cloning an `Arc` copies a pointer, never the value. The
   value is freed when the last owner lets go. The worker, every task, and
   every ticket will hold an `Arc` to the same pass.
 
-- `Mutex` (a lock) makes threads take turns: `lock()` waits until no one
-  else holds it, then hands you a *guard* — a value that stands for "I
-  hold the lock right now" and lets you reach the data inside. When the
-  guard goes out of scope (the block or statement holding it ends) it is
+- `Mutex` (a lock) makes threads take turns. `lock()` waits until no one
+  else holds the lock, then hands you a *guard*. The guard is a value that
+  stands for "I hold the lock right now," and it lets you reach the data
+  inside. When the block or statement holding the guard ends, the guard is
   dropped, and dropping it opens the lock again automatically.
 
 - `Condvar` (a condition variable) is the pass's bell. A thread holding
-  the lock can call `wait(guard)`: that releases the lock, sleeps until
-  someone calls `notify_all()`, then takes the lock back. The bell says
-  only "something changed" — never what — so every sleeper re-checks its
-  own number and goes back to sleep if it isn't there yet. That is why
+  the lock can call `wait(guard)`. That call releases the lock, sleeps
+  until someone calls `notify_all()`, then takes the lock back. The bell
+  says only "something changed," never what. So every sleeper re-checks
+  its own number and goes back to sleep if it isn't there yet. That is why
   the code below waits inside a `loop`.
 
-Results come in every type — a `u64` here, a `String` there — but one
+Results come in every type, a `u64` here and a `String` there. But one
 table must hold them all. So the pass stores each value as `Arc<dyn Any +
 Send + Sync>`: "a shared box holding *something*, type unknown." You met
 `dyn Any` on Day 1 when unwrapping a panic's message. `Sync` is `Send`'s
 twin and means "safe for several threads to *read* at once."
 
 The ticket is what remembers the real type `T`. So when `get` takes a
-box off the pass, it opens it with `downcast_ref::<T>()` — "give me the
-`T` inside" — the same tool `from_panic` used on Day 1.
+box off the pass, it opens the box with `downcast_ref::<T>()`, which
+means "give me the `T` inside." It is the same tool `from_panic` used on
+Day 1.
 
-Nine edits, in order. The first creates a new file; the rest rework
+Make nine edits, in order. The first creates a new file. The rest rework
 `src/main.rs` and `src/worker.rs`.
 
 1. Create `src/ticket.rs` with the ticket number, the pass, and the new
@@ -473,28 +474,28 @@ Nine edits, in order. The first creates a new file; the rest rework
 
    - `ObjectId(u64)` is a *tuple struct*: a named wrapper around one
      number, so an id can never be confused with any other `u64`. Its
-     `derive` line asks for the abilities a key needs: `Copy` (copying it
-     is as cheap as copying the number — no `.clone()` needed), `Eq` and
-     `Hash` (so a `HashMap` can use it as a key). `Display` prints it as
+     `derive` line asks for the abilities a key needs. `Copy` makes
+     copying it as cheap as copying the number, with no `.clone()` needed.
+     `Eq` and `Hash` let a `HashMap` use it as a key. `Display` prints it as
      `#1`.
 
    - `next_id` is an `AtomicU64`, a number that several threads may
      update at once without a lock. `fetch_add(1, …)` returns the current
-     value and bumps it, in one indivisible step, so no two tasks ever get
-     the same number. (`Ordering::Relaxed` says we only need the number to
+     value and bumps it in one indivisible step, so no two tasks ever get
+     the same number. (`Ordering::Relaxed` says the number only needs to
      be unique, not to coordinate anything else.)
 
    - `Outcome` is a *type alias*: a short name for the long
      `Result<Arc<dyn Any + Send + Sync>, TaskError>`, which appears
      several times today.
 
-   - `Ticket` holds no `T` at all — only an id — yet it must remember
-     which type its result has. `PhantomData<T>` is a zero-size marker
-     field for exactly that: "this struct is *about* a `T`."
+   - `Ticket` holds no `T` at all, only an id. Yet it must remember which
+     type its result has. `PhantomData<T>` is a zero-size marker field for
+     exactly that: "this struct is *about* a `T`."
 
    - `get` now takes `&self`, a borrow, so reading never consumes the
      ticket. It lives in its own `impl` block with the bound `T: Clone`,
-     because it hands out a *copy* of the result — the original stays on
+     because it hands out a *copy* of the result. The original stays on
      the pass.
 
    - The `?` after `self.store.get(self.id)` means "if this is an error,
@@ -502,14 +503,14 @@ Nine edits, in order. The first creates a new file; the rest rework
 
 2. In `src/main.rs`, declare the new module: add `mod ticket;` as the
    first line, above `mod worker;`. That line tells Rust "there is a
-   module named `ticket`; its code is in `src/ticket.rs`" — exactly how
-   `mod worker;` found `src/worker.rs` on Day 1.
+   module named `ticket`, and its code is in `src/ticket.rs`." It works
+   exactly the way `mod worker;` found `src/worker.rs` on Day 1.
 
 3. In `src/worker.rs`, replace the import lines at the top of the file
-   (the first five lines) with these. `Receiver` is gone: tickets no
-   longer hold a channel. The last line reaches into the new module:
-   `crate::` means "starting from the top of this program", so
-   `crate::ticket::Ticket` is "the `Ticket` inside the `ticket` module".
+   (the first five lines) with these. `Receiver` is gone, because tickets
+   no longer hold a channel. The last line reaches into the new module.
+   `crate::` means "starting from the top of this program," so
+   `crate::ticket::Ticket` is "the `Ticket` inside the `ticket` module."
    (`src/ticket.rs` reaches back the same way, with
    `crate::worker::TaskError`.)
 
@@ -539,7 +540,7 @@ Nine edits, in order. The first creates a new file; the rest rework
    ```
 
 6. Replace the whole `submit` method (around line 50) with this version.
-   The old body made a private channel; the new one asks the pass for a
+   The old body made a private channel. The new one asks the pass for a
    number instead:
 
    ```rust,ignore
@@ -631,12 +632,12 @@ Nine edits, in order. The first creates a new file; the rest rework
    ```
 
 Why does the stub exist? Remember Day 1's *"worker stopped before the
-task finished"*: it came for free, because a thrown-away job dropped its
+task finished"*. It came for free, because a thrown-away job dropped its
 channel's sender, and `recv` noticed. Now there is no channel. If a job
 were thrown away unrun, nothing would ever land under its number, and its
 `get` would wait for the bell forever. The stub closes that hole with
-the `Drop` hook you met on Day 1: `keep` stores the outcome and marks the
-stub kept; if a stub is dropped *without* being kept, its `drop` stores
+the `Drop` hook you met on Day 1. `keep` stores the outcome and marks the
+stub kept. If a stub is dropped *without* being kept, its `drop` stores
 the "worker stopped" error instead. Either way, something lands.
 
 Now a demo of the new tickets. Replace `src/main.rs` with:
@@ -692,9 +693,9 @@ fn main() {
 ```
 
 `slow_burn` is a plain function, so `worker.submit(slow_burn)` hands it
-over by name — no `|| …` closure needed when the task takes no arguments.
-It sleeps first so that its crash report prints *after* the `submit`
-line, not in the middle of it.
+over by name. A task that takes no arguments needs no `|| …` closure. It
+sleeps first, so its crash report prints *after* the `submit` line, not
+in the middle of it.
 
 `cargo run`:
 
@@ -718,8 +719,8 @@ Read it line by line:
   ticket number 1, at once. `submit` asked the pass for a fresh number
   with `new_id`, and the ticket's `Display` printed it as `#1`.
 
-- `clone the ticket -> ticket #1` — a photocopy of the ticket, same
-  number. `clone` copied the id and the `Arc` pointer to the pass; no
+- `clone the ticket -> ticket #1` — a photocopy of the ticket, with the
+  same number. `clone` copied the id and the `Arc` pointer to the pass. No
   dish was copied, because none exists yet.
 
 - `get ticket #1 -> 49` — the waiter waits at the pass for spot #1.
@@ -730,15 +731,15 @@ Read it line by line:
   the pass. Yesterday this line could not compile.
 
 - `submit a burning task -> ticket #2`, then the crash report — the
-  dish burns on the cook's thread; Rust prints its standard crash report
-  as on Day 1. `run_catching` caught it, and the stub stored a
+  dish burns on the cook's thread, and Rust prints its standard crash
+  report as on Day 1. `run_catching` caught it, and the stub stored a
   `TaskError` under #2.
 
 - `get ticket #2 (try 1)` and `(try 2)` — the burnt-dish note is read
   twice, identically. `get` cloned the stored error each time.
 
-Five new tests pin today's behavior. The pass gets its own tests, which
-need no worker at all: they put results in by hand. Append to
+Five new tests pin today's behavior. The pass gets its own tests, and
+they need no worker at all, because they put results in by hand. Append to
 `src/ticket.rs`:
 
 ```rust,ignore
@@ -785,8 +786,8 @@ mod tests {
 
 One new tool appears in `ids_are_unique_and_count_up_from_one`:
 `(0..3).map(…)` produces three values one at a time, and `.collect()`
-gathers them into a collection — here the `Vec<String>` named on the
-left.
+gathers them into a collection. Here that is the `Vec<String>` named on
+the left.
 
 Then two tests in `src/worker.rs`:
 
@@ -826,9 +827,9 @@ Then two tests in `src/worker.rs`:
    }
    ```
 
-The second test drops a stub without keeping it — exactly what
-happens to a job thrown away unrun — and checks that its ticket reports
-"worker stopped" instead of hanging.
+The second test drops a stub without keeping it, which is exactly what
+happens to a job thrown away unrun. Then it checks that the ticket
+reports "worker stopped" instead of hanging.
 
 ```bash
 cargo test
@@ -852,7 +853,7 @@ test worker::tests::dropping_the_worker_waits_for_queued_jobs ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
 ```
 
-All seven of Day 1's tests still pass untouched: `submit` and `get` kept
+All seven of Day 1's tests still pass untouched. `submit` and `get` kept
 their names and their behavior, even though everything behind them
 moved.
 
@@ -869,18 +870,18 @@ moved.
 
 Your section A tickets can be copied and read any number of times. But
 reading still means standing at the pass for one particular number, for
-as long as it takes. Hold three tickets and you can only `get` them one
-by one, in the order you guess; and if a dish takes an hour, so does
-your `get`. Ray answers this with `ray.wait`: "give me the ones that are
+as long as it takes. Hold three tickets, and you can only `get` them one
+by one, in the order you guess. If a dish takes an hour, so does your
+`get`. Ray answers this with `ray.wait`: "give me the ones that are
 ready — at least this many — but don't keep me longer than this."
 
-The plan in plain words: lock the pass, count how many of my numbers have
-landed, and if that's enough — or my time is up — report which ones.
-Otherwise sleep on the bell until something lands *or* the deadline
+Here is the plan in plain words. Lock the pass and count how many of my
+numbers have landed. If that's enough, or my time is up, report which
+ones. Otherwise, sleep on the bell until something lands *or* the deadline
 arrives, whichever comes first, and count again. `Condvar` has a variant
 of `wait` for exactly that: `wait_timeout`.
 
-Three edits to `src/ticket.rs`, in order:
+Make three edits to `src/ticket.rs`, in order:
 
 1. Add the clock imports below the other `use std::…` lines (around
    line 7):
@@ -956,23 +957,23 @@ Three edits to `src/ticket.rs`, in order:
 A few details in those two blocks:
 
 - `filter(|&&is_ready| is_ready)` counts the `true`s. The two `&`s
-  unwrap two layers of borrowing — one from iterating the list, one
-  added by `filter` — so `is_ready` is a plain `bool`.
+  unwrap two layers of borrowing: one from iterating the list, and one
+  added by `filter`. So `is_ready` is a plain `bool`.
 
 - `wait_timeout` returns a pair: the lock guard, and a note saying
-  whether the time ran out. We keep the guard (`.0`) and ignore the note,
-  because the loop re-checks the clock itself.
+  whether the time ran out. The code keeps the guard (`.0`) and ignores
+  the note, because the loop re-checks the clock itself.
 
 - `let Some(first) = tickets.first() else { … }` reads "take the first
   ticket — and if there is none, return two empty lists right away."
-  The first ticket also tells us which pass to look at; that is why every
+  The first ticket also says which pass to look at. That is why every
   ticket must come from the same worker today.
 
 - The final loop walks the tickets and their ready-flags side by side
   (`zip`) and sorts them into two piles. Order is kept, and the `ready`
-  pile never grows past `num_ready` — the same rule as Ray's.
+  pile never grows past `num_ready`, the same rule as Ray's.
 
-Now the demo. Three edits to `src/main.rs`:
+Now the demo. Make three edits to `src/main.rs`:
 
 1. Replace the `use std::time::Duration;` and `use worker::Worker;` lines
    with these three:
@@ -1059,23 +1060,23 @@ wait for 2, max 5 s   -> ready [#4, #5], pending [] at about 900 ms
 wait on the burnt one -> ready [#2] (a failure counts as done)
 ```
 
-(The crash report now says line 18 instead of 17: the new `use ticket`
-line pushed `slow_burn` down by one. Everything else above the divider is
-identical.)
+(The crash report now says line 18 instead of 17, because the new
+`use ticket` line pushed `slow_burn` down by one. Everything else above
+the divider is identical.)
 
 Read the new lines one by one:
 
 - `submit 3 orders -> tickets [#3, #4, #5]` — three slips go on the rail
-  in one trip; `numbers` printed their ticket numbers. Each dish takes
-  300 ms, and there is one cook, so they will land at about 300, 600 and
-  900 ms.
+  in one trip, and `numbers` printed their ticket numbers. Each dish takes
+  300 ms, and there is one cook, so the dishes will land at about 300, 600
+  and 900 ms.
 
 - `wait for 1, max 5 s -> ready [#3] …` — the waiter glances at the pass
-  until one dish is up. `wait` returned as soon as #3 landed: the cook's
+  until one dish is up. `wait` returned as soon as #3 landed. The cook's
   `put` rang the bell, and `MemoryStore::wait`'s count reached 1.
 
 - `wait for 1, max 0.1 s -> ready [] …` — this time the waiter gives up
-  after 100 ms: #4 lands at about 600 ms, too late. `wait_timeout` woke
+  after 100 ms, because #4 lands at about 600 ms, too late. `wait_timeout` woke
   at the deadline, the clock check returned, and every ticket went to the
   pending pile.
 
@@ -1083,14 +1084,14 @@ Read the new lines one by one:
   remaining dishes, and gets them at about 900 ms.
 
 - `wait on the burnt one -> ready [#2]` — section A's burnt dish counts
-  as ready: its spot on the pass holds a note, and a note is an outcome.
+  as ready. Its spot on the pass holds a note, and a note is an outcome.
 
 The times are rounded to the nearest 100 ms by `round_to_100`. Unrounded,
-my run printed 306, 411 and 915 ms — a few milliseconds of thread
-wake-up on top of the cooking. Your raw numbers will differ slightly;
+my run printed 306, 411 and 915 ms: a few milliseconds of thread
+wake-up on top of the cooking. Your raw numbers will differ slightly, but
 the rounded ones should match.
 
-Five tests pin `wait`. Two edits to `src/ticket.rs`'s `mod tests`:
+Five tests pin `wait`. Make two edits to `src/ticket.rs`'s `mod tests`:
 
 1. Replace its import lines (around line 162) with:
 
@@ -1186,13 +1187,13 @@ Look at how they avoid racing the clock:
 
 - `wait_wakes_as_soon_as_enough_results_land` and
   `a_failed_task_counts_as_ready` give `wait` a generous 60-second limit.
-  Each normally finishes in a moment — but only if the result's `put`
+  Each normally finishes in a moment, but only if the result's `put`
   really rings the bell. A slow machine only makes them slower, never
   wrong.
 
 - `wait_gives_up_when_the_timeout_runs_out`, the one test that *must*
-  involve time, only checks that at least 50 ms passed — a busy laptop
-  can make it later, never earlier.
+  involve time, only checks that at least 50 ms passed. A busy laptop
+  can make it later, but never earlier.
 
 - `wait_on_no_tickets_returns_at_once` has nothing to wait for at all.
 
@@ -1231,9 +1232,9 @@ test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 </div>
 
 Your tickets can now be copied, read, and waited on. Can one go *into*
-another task? Try the obvious way with what you have: move a copy into
+another task? Try the obvious way with what you have. Move a copy into
 the next task's closure, and `get` it there. To see what happens when
-the input burns, add this to section B's `main`, just above the `wait on
+the input burns, add this to section B's `main`, right above the `wait on
 the burnt one` lines:
 
 ```rust,ignore
@@ -1259,8 +1260,8 @@ naive -> error: task failed: called `Result::unwrap()` on an `Err` value: TaskEr
 Three things went wrong, and each one gets worse as the kitchen grows:
 
 - **The second task ran anyway.** It started, called `get`, found an
-  error, and crashed on `unwrap` — a *second* crash report for one burnt
-  dish.
+  error, and crashed on `unwrap`. That is a *second* crash report for one
+  burnt dish.
 
 - **The error got mangled.** "The oven caught fire" now arrives buried
   inside an `unwrap` complaint. Every task in a longer chain would wrap
@@ -1268,27 +1269,26 @@ Three things went wrong, and each one gets worse as the kitchen grows:
 
 - **The cook stood at the pass.** The second task occupied the cook from
   the moment it started until its input landed. With one cook and
-  first-in-first-out slips, the input happens to be ready by then — the
-  first task was ahead in line. On Day 4, with several cooks, a cook
-  waiting at the pass is a cook not cooking — and if every cook waits for
+  first-in-first-out slips, the input happens to be ready by then, because
+  the first task was ahead in line. On Day 4, with several cooks, a cook
+  waiting at the pass is a cook not cooking. And if every cook waits for
   a dish that only a cook can make, nothing moves at all.
 
 Delete those lines again. The better design takes the waiting away from
-the cook. The slip does not go on the cook's rail yet: the pass holds it,
-clipped to the empty spot of the dish it needs, and the slip moves to the
-rail only once that dish has landed. The task itself receives a plain
-value. If the input burned, the task never runs; its spot on the pass
-gets a copy of the input's note.
+the cook. The slip does not go on the cook's rail yet. Instead, the pass
+holds it, clipped to the empty spot of the dish it needs, and the slip
+moves to the rail only once that dish has landed. The task itself
+receives a plain value. If the input burned, the task never runs, and its
+spot on the pass gets a copy of the input's note.
 
-Where does a slip wait in the meantime? Right on the pass: clipped to the
+Where does a slip wait in the meantime? Right on the pass, clipped to the
 empty spot of the dish it needs. So a spot on the pass now has two
-possible states — a finished dish, or a list of slips waiting for one. A
-Rust `enum` says exactly that. And because "store a result" and "is
-anyone waiting?" must be decided together, both live under the *same*
-lock: otherwise a slip could be clipped a moment after the dish landed
-and wait forever.
+possible states: a finished dish, or a list of slips waiting for one. A
+Rust `enum` says exactly that. "Store a result" and "is anyone waiting?"
+must be decided together, so both live under the *same* lock. Otherwise
+a slip could be clipped a moment after the dish landed, and wait forever.
 
-Seven edits to `src/ticket.rs`, in order:
+Make seven edits to `src/ticket.rs`, in order:
 
 1. The pass will hold jobs now, so import `Job` too. Replace the
    `use crate::worker::TaskError;` line (around line 9) with:
@@ -1377,8 +1377,8 @@ Seven edits to `src/ticket.rs`, in order:
                    .collect();
    ```
 
-   `matches!(value, pattern)` is `true` when the value fits the pattern;
-   the `_` inside `Slot::Ready(_)` means "anything in there".
+   `matches!(value, pattern)` is `true` when the value fits the pattern.
+   The `_` inside `Slot::Ready(_)` means "anything in there."
 
 7. Give `Ticket` its own `when_ready`, so code holding only a ticket can
    ask the pass to hold a job for it. Inside `impl<T> Ticket<T>`, after the
@@ -1396,23 +1396,23 @@ Seven edits to `src/ticket.rs`, in order:
 Two details carry the whole design:
 
 - In `put`, `insert` hands back whatever the spot held *before*. If it
-  was `Waiting`, those are the held slips, and `put` releases them — but
-  only after the lock is gone. Here is why it is gone. The guard that
-  `lock()` returns is never stored in a variable; it is used once, for
-  `insert`, inside the `let before = …` statement. A value nobody stores
-  is dropped as soon as its statement ends, and dropping the guard opens
-  the lock. So by the time the release loop runs, the pass is unlocked
-  again. Why bother? A released job is
-  arbitrary code. Today's only sends a slip down a channel, but a job
-  that touched the pass itself would try to take a lock its own thread
-  already holds — and a `Mutex` answers that by deadlocking (or
-  panicking). Releasing outside the lock rules it out for good.
+  was `Waiting`, those are the held slips, and `put` releases them. But it
+  does so only after the lock is gone. Here is why the lock is gone. The
+  guard that `lock()` returns is never stored in a variable. It is used
+  once, for `insert`, inside the `let before = …` statement. A value nobody
+  stores is dropped as soon as its statement ends, and dropping the guard
+  opens the lock. So by the time the release loop runs, the pass is
+  unlocked again. Why bother? A released job is arbitrary code. Today's
+  job only sends a slip down a channel. But a job that touched the pass
+  itself would try to take a lock its own thread already holds, and a
+  `Mutex` answers that by deadlocking (or panicking). Releasing outside the
+  lock rules that out for good.
 
 - `when_ready` uses `entry(id).or_insert_with(…)`: "find id's spot,
   creating an empty `Waiting` one if there is none." If the spot is
-  `Waiting`, the job is clipped on, and we return. If it is `Ready`, the
-  dish is already there: we unlock (`drop(results)`) and run the job
-  right away.
+  `Waiting`, `when_ready` clips the job on and returns. If it is `Ready`,
+  the dish is already there, so `when_ready` unlocks (`drop(results)`) and
+  runs the job right away.
 
 Now the worker's side, in `src/worker.rs`. Inside `impl Worker`, after
 the closing brace of `submit` (around line 61), add `submit_with`:
@@ -1452,22 +1452,22 @@ the closing brace of `submit` (around line 61), add `submit_with`:
 
 Read it as two pieces that meet later:
 
-- `job` is the slip: get the input (it has landed by the time this runs,
-  so `get` returns at once), run the task on it with `run_catching` — or,
-  if the input is an error, skip the task and pass the error on — and
-  keep the stub. It is built now, but not pinned to the rail.
+- `job` is the slip. It gets the input, which has landed by the time the
+  job runs, so `get` returns at once. It runs the task on the input with
+  `run_catching`. If the input is an error, it skips the task and passes
+  the error on. Then it keeps the stub. The slip is built now, but not
+  pinned to the rail.
 
-- The small closure handed to `input.when_ready` is the clip: when the
-  input lands, it pins `job` to the rail by sending it down a copy of the
-  worker's channel `sender`. Until then, it waits on the input's spot.
+- The small closure handed to `input.when_ready` is the clip. When the
+  input lands, the clip pins `job` to the rail by sending it down a copy
+  of the worker's channel `sender`. Until then, it waits on the input's spot.
 
 `submit_with` returns the new ticket immediately, whether or not the
-input has landed yet. The
-generic letters read like `submit`'s: `A` is the input's type, `T` the
-result's, and `F` the task — a function that takes an `A` and returns a
-`T`.
+input has landed yet. The generic letters read like `submit`'s. `A` is
+the input's type, `T` the result's, and `F` the task: a function that
+takes an `A` and returns a `T`.
 
-Now feed tickets into tasks. Two edits to `src/main.rs`:
+Now feed tickets into tasks. Make two edits to `src/main.rs`:
 
 1. After `slow_square` (around line 14), add three plain one-argument
    functions. They print, so you can see which tasks the cook runs, and
@@ -1542,7 +1542,7 @@ Now feed tickets into tasks. Two edits to `src/main.rs`:
    ```
 
 `submit_with(&base, add_one)` passes `add_one` by name, the same way
-section A passed `slow_burn`: a plain function that takes a `u64` is
+section A passed `slow_burn`. A plain function that takes a `u64` is
 already a task that takes a `u64`.
 
 `cargo run`:
@@ -1583,7 +1583,7 @@ the oven caught fire
 get ticket #11        -> error: task failed: the oven caught fire
 ```
 
-(One change above the divider: the crash report now says line 35
+(One line above the divider changed: the crash report now says line 35
 instead of 18. The three new functions, with their doc comment, pushed
 `slow_burn` down 17 lines.)
 
@@ -1592,16 +1592,16 @@ Read the new lines one by one:
 - `submit slow_square(3) -> ticket #6` — an ordinary slip, on the rail.
   The cook starts its 300 ms of cooking.
 
-- `submit add_one(#6) -> ticket #7` — a slip that needs dish #6. It is
+- `submit add_one(#6) -> ticket #7` — a slip that needs dish #6. It gets
   clipped to the empty spot #6, and the waiter gets ticket #7 at once.
   `submit_with` built the job and handed the clip to `when_ready`, which
   found no dish on spot #6 and clipped it there.
 
 - `submit double(#7) -> ticket #8` — a slip that needs a dish whose own
-  slip is still waiting: a chain of three. Clipped to spot #7.
+  slip is still waiting: a chain of three. It is clipped to spot #7.
 
-- `submit times_ten(#6) -> ticket #9` — a second slip needing dish #6:
-  the same ticket used twice, the move that could not compile at the
+- `submit times_ten(#6) -> ticket #9` — a second slip needing dish #6.
+  The same ticket is used twice, the move that could not compile at the
   start of section A.
 
 - `is #6 ready yet? -> false` — a peek (`wait` with `Duration::ZERO`)
@@ -1609,13 +1609,13 @@ Read the new lines one by one:
   existed.
 
 - `cook: add_one(9) = 10` and `cook: times_ten(9) = 90` — dish #6 (3 × 3
-  = 9) lands, `put` rings the bell and releases both slips clipped to its
+  = 9) lands. `put` rings the bell and releases both slips clipped to its
   spot, in the order they were clipped. Each receives the plain value 9.
 
-- `cook: double(10) = 20` — runs last, although it was submitted before
-  `times_ten`. Its slip waited on spot #7, so it reached the rail only
-  when `add_one`'s dish landed — behind `times_ten`, which was already
-  there.
+- `cook: double(10) = 20` — `double` runs last, although it was
+  submitted before `times_ten`. Its slip waited on spot #7, so it reached
+  the rail only when `add_one`'s dish landed. By then `times_ten` was
+  already on the rail, ahead of it.
 
 - `get ticket #8 -> 20` and `get ticket #9 -> 90` — the waiter collects
   the ends of both chains.
@@ -1624,10 +1624,11 @@ Read the new lines one by one:
   a slip that needs a dish which is about to burn.
 
 - The crash report, then `get ticket #11 -> error: task failed: the oven
-  caught fire` — dish #10 burns; its note lands on spot #10 and releases
-  slip #11. That job found an error where its input should be, skipped
-  `add_one` entirely — no `cook: add_one(…)` line, and only *one* crash
-  report — and kept its stub with the same note, message intact.
+  caught fire` — dish #10 burns. Its note lands on spot #10 and releases
+  slip #11. That job found an error where its input should be, so it
+  skipped `add_one` entirely: there is no `cook: add_one(…)` line, and
+  only *one* crash report. It kept its stub with the same note, message
+  intact.
 
 Seven tests pin the new behavior. In `src/ticket.rs`:
 
@@ -1748,11 +1749,11 @@ And in `src/worker.rs`, replace the final closing `}` of the file with:
 
 None of them sleeps or measures time. The two `when_ready` tests drive
 the pass by hand, with a `put` or without one. Two worker tests use a
-*gate* — a channel only the test can open — to keep a task provably
-unfinished: `submit_with_returns_before_its_input_is_ready`, and
-`a_held_task_joins_the_queue_when_its_input_lands`, which pins the
-ordering you saw in the demo (a slip submitted later, but not waiting on
-anything, runs before a held slip). The other three only block in `get`,
+*gate*, a channel only the test can open, to keep a task provably
+unfinished. They are `submit_with_returns_before_its_input_is_ready` and
+`a_held_task_joins_the_queue_when_its_input_lands`. The second pins the
+ordering you saw in the demo: a slip submitted later, but not waiting on
+anything, runs before a held slip. The other three only block in `get`,
 which returns when the result lands, however fast or slow your machine
 is.
 
@@ -1841,28 +1842,28 @@ get ticket #11        -> error: task failed: the oven caught fire
 The whole evening at the pass, one stretch at a time:
 
 - `ticket #1` through `get the copy -> 49` — the dish lands on spot #1
-  and stays there; the ticket and its photocopy both read it.
+  and stays there. The ticket and its photocopy both read it.
   (`MemoryStore::get`, through `Ticket::get`.)
 
 - `ticket #2` and its two `try` lines — a burnt-dish note on spot #2,
-  read twice. (`run_catching` caught the crash, the stub's `keep` stored
-  it.)
+  read twice. (`run_catching` caught the crash, and the stub's `keep`
+  stored it.)
 
 - `submit 3 orders` and the `wait` lines — the waiter glances at the pass
-  with a time limit: one dish, then none in time, then both of the rest;
-  a burnt dish counts as done. (`wait`, over `MemoryStore::wait`.)
+  with a time limit. One dish is up, then none in time, then both of the
+  rest. A burnt dish counts as done. (`wait`, over `MemoryStore::wait`.)
 
 - `ticket #6` through `get ticket #9` — slips clipped to empty spots, a
   chain and a fan-out, each released the moment its dish lands, each fed
   a plain value. (`submit_with`, `when_ready`, and the release loop in
   `put`.)
 
-- `ticket #10`, `ticket #11` — the burnt note travels down the chain; the
-  dependent task never runs.
+- `ticket #10`, `ticket #11` — the burnt note travels down the chain, and
+  the dependent task never runs.
 
-What varies between runs: the thread id in brackets, the panic's line
-number if your `main` is laid out differently, and — in principle — the
-timings, which the rounding hides. Everything else, including the order
+A few things vary between runs. The thread id in brackets varies, and so
+does the panic's line number if your `main` is laid out differently. In
+principle the timings vary too, but the rounding hides that. Everything else, including the order
 of the `cook:` lines, is the same every run. (One honest caveat: the demo
 relies on the 300 ms of cooking to print its `submit` lines before the
 cook's lines. The tests don't rely on timing at all.)
@@ -1870,20 +1871,20 @@ cook's lines. The tests don't rely on timing at all.)
 Two more things to notice:
 
 - Only one crash report prints for the second burnt dish, although two
-  tickets carry its note. The note is *copied* onto spot #11; nothing
+  tickets carry its note. The note is *copied* onto spot #11, and nothing
   burned twice.
 
 - The `note: run with RUST_BACKTRACE=1` line appears only once, after the
-  first crash: Rust prints that hint only for the first panic in a
+  first crash. Rust prints that hint only for the first panic in a
   program.
 
 ## 9. Test it
 
-Twenty-four tests now pin the engine — Day 1's seven, plus 17 new ones
-today: numbered, copyable tickets and the stub that prevents endless
-waits (section A, 5 tests), `wait` with order, limits and timeouts
-(section B, 5), and held slips, chains, fan-out and error propagation
-(section C, 7):
+Twenty-four tests now pin the engine: Day 1's seven, plus 17 new ones
+today. Section A's 5 pin numbered, copyable tickets and the stub that
+prevents endless waits. Section B's 5 pin `wait` with order, limits and
+timeouts. Section C's 7 pin held slips, chains, fan-out and error
+propagation:
 
 ```bash
 cargo test
@@ -1919,7 +1920,7 @@ test worker::tests::dropping_the_worker_waits_for_queued_jobs ... ok
 test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 ```
 
-(All 24 are unit tests; the program takes no command-line input yet, so
+(All 24 are unit tests. The program takes no command-line input yet, so
 there is nothing for a command-line test to drive.)
 
 ## 10. Break it deliberately
@@ -1931,8 +1932,8 @@ line:
 -        self.landed.notify_all();
 ```
 
-Everything still compiles — the compiler cannot know that a sleeping
-thread needs waking. `cargo run` prints two lines and then **hangs**
+Everything still compiles, because the compiler cannot know that a
+sleeping thread needs waking. `cargo run` prints two lines and then **hangs**
 (press Ctrl-C to stop it):
 
 ```text
@@ -1944,9 +1945,9 @@ Read the silence:
 
 - `get ticket #1` never prints. `MemoryStore::get` found spot #1 empty
   and went to sleep on the bell. The cook put 49 on the pass about 300 ms
-  later — but never rang, so the waiter sleeps on, beside a finished dish.
+  later, but never rang. So the waiter sleeps on, beside a finished dish.
 
-`cargo test` is more talkative. Ten tests pass at once; then, after a
+`cargo test` is more talkative. Ten tests pass at once. Then, after a
 minute, the test runner starts reporting the others (lines trimmed to
 the interesting ones):
 
@@ -1961,10 +1962,10 @@ test ticket::tests::wait_wakes_as_soon_as_enough_results_land ... ok
 test ticket::tests::a_failed_task_counts_as_ready ... ok
 ```
 
-Fourteen tests were reported as running for over a minute; the five
+Fourteen tests were reported as running for over a minute, and the five
 shown are a sample. Read it as a post-mortem:
 
-- The ten that passed never needed the bell: they put the result on the
+- The ten that passed never needed the bell. They put the result on the
   pass *before* anyone waited for it (like
   `every_copy_of_a_ticket_reads_the_same_result`), or never waited at all.
 
@@ -1976,13 +1977,13 @@ shown are a sample. Read it as a post-mortem:
   their timeout. `wait_timeout` woke at the deadline, re-counted, and
   found the dish that had been sitting there for a minute. That is why
   the wake-up test gives `wait` a generous 60 s limit and then expects to
-  finish fast: a missing bell turns "fast" into "a minute", and a minute
+  finish fast. A missing bell turns "fast" into "a minute," and a minute
   is impossible to miss.
 
 The lesson: **a condition variable comes with a duty to notify.** Every place
 that changes what sleepers are waiting for must ring the bell, or the
-sleepers sleep through it. Ray's own object store has the same duty —
-whenever an object becomes available, everyone blocked on it must be told.
+sleepers sleep through it. Ray's own object store has the same duty.
+Whenever an object becomes available, everyone blocked on it must be told.
 
 Put the `notify_all` line back and confirm `cargo test` is green again.
 
@@ -2022,31 +2023,31 @@ git diff v1-day-01 v1-day-02
 
 ## 12. Recap
 
-**What changed today:** results moved out of the tickets' private channels onto the
-pass — a `MemoryStore` table keyed by `ObjectId`, guarded by a `Mutex`
-and a `Condvar` bell — and tickets became copyable ids that `get` can
-read any number of times. The cook's stub (`Promise`) guarantees every
+**What changed today:** results moved out of the tickets' private
+channels onto the pass. The pass is a `MemoryStore` table keyed by
+`ObjectId`, guarded by a `Mutex` and a `Condvar` bell. Tickets became
+copyable ids that `get` can read any number of times. The cook's stub (`Promise`) guarantees every
 ticket's spot is eventually filled, even if a job is thrown away. `wait`
 collects whichever results are ready, with a time limit, in Ray's
-`(ready, pending)` shape. `submit_with` passes a ticket into the next task: the
-slip waits clipped to its input's spot, joins the rail when the input
-lands, receives a plain value — and never runs if the input failed,
-inheriting its error instead. Seventeen new tests (24 in all) pin it
+`(ready, pending)` shape. `submit_with` passes a ticket into the next
+task. The slip waits clipped to its input's spot, joins the rail when the
+input lands, and receives a plain value. If the input failed, the slip
+never runs, and it inherits the input's error instead. Seventeen new tests (24 in all) pin it
 across three section checkpoints (`v1-day-02a`, `v1-day-02b`,
 `v1-day-02c`), still with no dependencies.
 
 **Deliberately naive:** `submit_with` takes exactly one input ticket,
-where Ray accepts any number; `wait` needs all its tickets to be of one
-type and from one worker; there is still one cook, so held slips never
-save time yet; results are never removed from the pass, so a long-running
-program's pass only grows; and every result lives in the memory of this
-one program — a dish is shared by pointer, but there is no place that
+where Ray accepts any number. `wait` needs all its tickets to be of one
+type and from one worker. There is still one cook, so held slips never
+save time yet. Results are never removed from the pass, so a long-running
+program's pass only grows. And every result lives in the memory of this
+one program. A dish is shared by pointer, but there is no place that
 several workers could read the same bytes from.
 
 **Tomorrow's limitation, resolved on Day 3:** the pass is a table inside
 one program, holding Rust values. On Day 3 the kitchen gets a
-**pantry** — an object store: results become bytes, put in once, and
-every worker reads them without copying. That is the piece that lets
-results outlive the task that made them and, later, cross the line
-between processes and machines. The scene grows from a counter by the
+**pantry**, an object store. Results are put in once, and every worker
+reads them where they stand, without copying. That piece lets results outlive
+the task that made them. Later, it lets them cross the line between
+processes and machines. The scene grows from a counter by the
 stove into a shared pantry — see [the restaurant](story.md).

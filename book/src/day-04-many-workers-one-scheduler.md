@@ -31,7 +31,7 @@ git switch --detach v1-day-04a         # then 04b, 04c as you pass each section
 | C | `is_prime`, `count_primes`, `share`, `count_on` · ~45 lines | two timing helpers + one demo function, 3 tests |
 
 Section A is the longest sitting of the day. Section B is mostly moving
-code you already wrote; section C is mostly measuring. Three sections are
+code you already wrote, and section C is mostly measuring. Three sections are
 three natural sittings, and every checkpoint is a save point — nothing
 says a "day" must fit in one. Still **no dependencies**: everything comes
 from Rust's standard library.
@@ -58,11 +58,11 @@ does four new things:
   stored value without copying it.
 
 - **measures the payoff on real work.** One slow, purely computational
-  job, cut into pieces, runs on 1, 2, and 4 workers — on this machine it
-  drops to a bit more than a quarter of its time — and you find out why it
+  job, cut into pieces, runs on 1, 2, and 4 workers. On this machine it
+  drops to a bit more than a quarter of its time, and you find out why it
   is not *exactly* a quarter.
 
-That is Ray's worker pool and scheduler in miniature: **you say what to
+You are building Ray's worker pool and scheduler in miniature: **you say what to
 run, the runtime decides where.**
 
 <div class="dl-concepts"><span>Ray concepts used here:</span>
@@ -104,8 +104,8 @@ slip 16 alone             -> 24057 primes in 178 ms
 a crew of 4, 64 slips     -> 412849 primes in 571 ms, 3.65x as fast as 1 cook
 ```
 
-- `picked by hand, 2 cooks` and the two lines under it — four jobs: one
-  takes 800 ms, three take 200 ms each. They are handed to two workers in
+- `picked by hand, 2 cooks` and the two lines under it — four jobs. One
+  takes 800 ms, and three take 200 ms each. They are handed to two workers in
   turn, so the first worker gets the long job *and* a short one: 1000 ms
   of work. The second worker is done after 400 ms, then waits, idle, for
   600 ms.
@@ -113,7 +113,7 @@ a crew of 4, 64 slips     -> 412849 primes in 571 ms, 3.65x as fast as 1 cook
 - `one rail, a crew of 2` and the two lines under it — the same four jobs
   on a pool of two workers sharing one queue. One worker takes the long
   job; the other takes the three short ones, one after another. All four
-  are done after 800 ms instead of 1000 — and 800 ms is the long job
+  are done after 800 ms instead of 1000. And 800 ms is the long job
   alone, so nothing could finish sooner.
 
 - `sauce cooking, pasta held` and `pasta with sauce` — a pool of four.
@@ -122,15 +122,15 @@ a crew of 4, 64 slips     -> 412849 primes in 571 ms, 3.65x as fast as 1 cook
   runs the moment its input is ready, at about 300 ms.
 
 - `8 readers on a crew of 4` and `cooks used` — eight jobs read one stored
-  64 MiB value through the pool: no fresh memory, all four workers took a
-  share, and every job saw the stored value's own bytes.
+  64 MiB value through the pool. They use no fresh memory, all four workers take a
+  share, and every job sees the stored value's own bytes.
 
 - `this machine` down to `a crew of 4` — the measurement. The computer has
   18 cores. One job — count the prime numbers up to six million — is cut
   into 16 pieces and run on 1, 2, and 4 workers. Two workers take about
   half the time; four take a bit more than a quarter.
 
-- `slip 1 alone`, `slip 16 alone` — why not exactly a quarter: the pieces
+- `slip 1 alone`, `slip 16 alone` — these show why it is not exactly a quarter: the pieces
   are not equal. The last piece holds the biggest numbers and takes about
   four times as long as the first.
 
@@ -150,7 +150,7 @@ Today's scene: **the crew.** The kitchen has more than one cook now, and
 three things about the way they get their work start to hurt:
 
 - **The waiter picks the cook.** Every slip goes to a cook the waiter
-  chose — on Day 3 with `cooks[n % 2]`, taking turns. The waiter has to
+  chose. On Day 3 that was `cooks[n % 2]`, taking turns. The waiter has to
   decide when the slip is written, long before anyone knows how long each
   dish will take.
 
@@ -187,7 +187,7 @@ Walk the kitchen, one station per section:
 - **More cooks, less time — measured (section C).** A big job is cut into
   slips, and the crew works through them side by side. The job is done
   when the *last* slip is done. So the crew is only as fast as its
-  slowest finish — and that is why the size of the slips matters.
+  slowest finish. That is why the size of the slips matters.
 
 ```text
 the waiter pins slips               every slip goes on the one shared rail, in order
@@ -202,8 +202,8 @@ the pass                            the dish lands under its ticket number
 back to the top: take the next slip — until the rail is empty and closed
 ```
 
-Read it top to bottom, as one cook's evening: the left column is where
-the slip is, the right column says what happens there. Every cook in the
+Read it top to bottom, as one cook's evening. The left column is where
+the slip is, and the right column says what happens there. Every cook in the
 crew walks the same loop at the same time, and the only place they meet
 is the rail.
 
@@ -216,19 +216,19 @@ is the rail.
   a fixed number of threads, started once and reused for every task.
 
 - **The scheduler.** In Ray, you call `f.remote()` and never name a
-  worker; the scheduler on each node hands every waiting task to a free
+  worker. The scheduler on each node hands every waiting task to a free
   worker. Today's scheduler is one rule — *whoever is free takes the next
   task* — built from one shared queue. Ray's scheduler *pushes*: it picks
   a free worker and hands it the task. Ours *pulls*: free workers take
   tasks off the queue. On one machine the effect is the same: no task waits
   while a worker sits idle. Day 11 teaches the scheduler to prefer the
-  machine where a task's inputs already are, and Day 16 to count CPU and
+  machine where a task's inputs already are. Day 16 teaches it to count CPU and
   GPU slots.
 
 - **One call, wherever it runs.** `f.remote()` looks the same whether one
   worker or a thousand stand behind it. Today's `Submit` trait gives you
-  the same: `submit`, `submit_reading`, and `submit_with` are written
-  once, and work on a lone worker or on a whole pool.
+  the same. You write `submit`, `submit_reading`, and `submit_with`
+  once, and they work on a lone worker or on a whole pool.
 
 - **Task granularity.** Ray's tips for first-time users warn against tiny
   tasks: each task carries a fixed overhead, so too many tiny tasks spend
@@ -239,8 +239,8 @@ is the rail.
 - **Speedup, and Amdahl's law.** *Speedup* is the time on one worker
   divided by the time on N workers. It reaches N only if every part of the
   job can be split and the parts are equal. Amdahl's law names the other
-  limit: the part that cannot be split — handing out tasks, collecting
-  answers — caps the speedup however many workers you add. Today that
+  limit. The part that cannot be split (handing out tasks, collecting
+  answers) caps the speedup however many workers you add. Today that
   part takes well under a millisecond, so it does not show yet. It starts
   to matter on Day 7, when every task crosses a network.
 
@@ -340,15 +340,15 @@ A few details:
 - `SLIPS_MS` is a `const` array: four numbers, fixed when the program is
   compiled. `[u64; 4]` reads "an array of four `u64`s".
 
-- `cook_for` is what every slip does: it sleeps for `ms` milliseconds — a cook
-  busy at the stove — then returns the cook's name and the time on
+- `cook_for` is what every slip does. It sleeps for `ms` milliseconds, like a cook
+  busy at the stove. Then it returns the cook's name and the time on
   `clock`, a stopwatch the waiter started before handing out the first
   slip. `Instant` is a small `Copy` value, so every slip's `move` closure
   gets its own copy of the same starting moment.
 
 - `.enumerate()` pairs each item with its position: `(0, &800)`,
-  `(1, &200)`, …. Slip `n` goes to `cooks[n % 2]`: slips 0 and 2 to
-  `worker-1`, slips 1 and 3 to `worker-2`.
+  `(1, &200)`, …. Slip `n` goes to `cooks[n % 2]`, so slips 0 and 2 go to
+  `worker-1`, and slips 1 and 3 to `worker-2`.
 
 - `report` waits for all four slips, then prints two things: when *all*
   four were done (the latest finish), and each cook's share.
@@ -401,19 +401,19 @@ Read the new lines one by one:
   while slip 2 sat on the other cook's rail.
 
 Could the waiter pick more cleverly? Only by knowing in advance how long
-every slip will take — and the waiter never does. The fix is to stop
-picking at all: put every slip on **one** rail, and let each cook take
+every slip will take, and the waiter never knows that. The fix is to stop
+picking at all. Put every slip on **one** rail, and let each cook take
 the next slip the moment they are free.
 
-Day 1's rail was a channel: one `Sender` the waiter pins slips with, one
+Day 1's rail was a channel, with one `Sender` the waiter pins slips with and one
 `Receiver` the cook takes them from. A channel allows many `Sender`s but
-only one `Receiver`. So the crew shares the one `Receiver`: it goes into
-a `Mutex`, so only one cook at a time can take a slip, and the `Mutex`
+only one `Receiver`. So the crew shares the one `Receiver`. It goes into
+a `Mutex`, so only one cook at a time can take a slip. The `Mutex`
 goes into an `Arc`, so every cook holds a handle on it.
 
 First, the pool needs two of the worker's private tools:
 [the cook's stub](story.md#stub) (`Promise`) and `run_catching`. Make
-them visible to the rest of your crate. Four one-word edits to `src/worker.rs`, each adding `pub(crate)`
+them visible to the rest of your crate with four one-word edits to `src/worker.rs`, each adding `pub(crate)`
 at the start of a line:
 
 1. `fn run_catching<T, F>(task: F) -> Outcome` (around line 123) becomes
@@ -429,8 +429,8 @@ at the start of a line:
    `pub(crate) fn keep(`.
 
 `pub(crate)` means "public inside this program, invisible to anything
-outside it" — enough for a new file to use them. These marks are
-temporary: in section B the code that needs them moves back into
+outside it". That is enough for a new file to use them. These marks are
+temporary. In section B the code that needs them moves back into
 `worker.rs`, and you will remove them again.
 
 Now create `src/pool.rs`:
@@ -528,8 +528,8 @@ Read it piece by piece:
 - `Pool` has the same three parts as `Worker`, with one change: a list of
   thread handles (`handles`) instead of one.
 
-- `Pool::start` makes one channel, wraps its `Receiver` as
-  `Arc<Mutex<Receiver<Job>>>` — the rail — and starts `size` threads,
+- `Pool::start` makes one channel and wraps its `Receiver` as
+  `Arc<Mutex<Receiver<Job>>>`: the rail. Then it starts `size` threads,
   named `worker-1`, `worker-2`, and so on. Each thread gets its own
   `Arc::clone` of the rail.
 
@@ -539,9 +539,9 @@ Read it piece by piece:
 
 - `take_slips` is one cook's evening: a `loop` runs its body again and
   again until a `return` ends it. `rail.lock().unwrap().recv()` locks
-  the rail, waits for the next slip, and takes it; the `match` then cooks
+  the rail, waits for the next slip, and takes it. The `match` then cooks
   the slip (`Ok(job)`) or ends the evening (`Err(_)`). The lock lives only
-  until the end of that `let` statement — so the cook lets go of the rail
+  until the end of that `let` statement. So the cook lets go of the rail
   *before* cooking, and the next cook can take a slip meanwhile. When
   every `Sender` is gone and the rail is empty, `recv` returns an error
   and the cook goes home.
@@ -577,8 +577,8 @@ Last, the scene. Four edits to `src/main.rs`:
 
 4. Add `one_rail_for_the_crew();` as the last line of `main`.
 
-The only differences from `picked_by_hand`: one crew instead of two cooks,
-and no `enumerate` — the waiter never chooses, so the slip's position no
+Only two things differ from `picked_by_hand`. There is one crew instead of two cooks,
+and there is no `enumerate`: the waiter never chooses, so the slip's position no
 longer matters.
 
 `cargo run`:
@@ -612,7 +612,7 @@ one rail, a crew of 2     -> all 4 slips done after about 800 ms
 Read the new lines one by one:
 
 - `one rail, a crew of 2 -> all 4 slips done after about 800 ms` — the
-  same four slips, 200 ms sooner. 800 ms is the big slip alone; no kitchen could do
+  same four slips, 200 ms sooner. 800 ms is the big slip alone, so no kitchen could do
   better.
 
 - `the big slip's cook -> 1 of 4 slips, done at about 800 ms` — one cook
@@ -620,7 +620,7 @@ Read the new lines one by one:
 
 - `the other cook -> 3 of 4 slips, done at about 600 ms, then idle 200 ms`
   — the other cook took slip 1, came back to the rail for slip 2, then
-  slip 3. Nobody told it to; it was free first each time. Its last
+  slip 3. Nobody told it to. It was free first each time. Its last
   200 ms idle are not waste: there was nothing left to cook.
 
 Which thread takes the big slip depends on which one reaches the rail
@@ -713,10 +713,10 @@ mod tests {
 // ──────── new code ends here ────────
 ```
 
-None of them sleeps to make a point; they use gates, as on Day 2:
+None of them sleeps to make a point. They use gates instead, as on Day 2:
 
 - `a_crew_runs_every_slip_and_returns_its_result` — twenty slips on a
-  crew of three, each squaring its number; the answers add up to
+  crew of three, each squaring its number. The answers add up to
   1² + 2² + … + 20² = 2870, so every slip ran once and its result came
   back.
 
@@ -728,12 +728,12 @@ None of them sleeps to make a point; they use gates, as on Day 2:
 - `every_cook_in_the_crew_works_at_once` sends three slips that each
   report the cook's name and then wait at a gate. All three names can
   arrive only if three different cooks are cooking at the same time.
-  `filter_map` keeps only the values its closure returns as `Some`, and
-  `.ok()` turns each `recv_timeout` result into `Some(name)` or `None` —
+  `filter_map` keeps only the values its closure returns as `Some`.
+  `.ok()` turns each `recv_timeout` result into `Some(name)` or `None`,
   so a broken crew fails the assertion instead of hanging.
 
-- `dropping_the_crew_finishes_every_queued_slip` checks `Drop`: ten slips,
-  then drop the crew, then all ten have run.
+- `dropping_the_crew_finishes_every_queued_slip` checks `Drop`. It queues ten slips
+  and drops the crew, and then all ten have run.
 
 ```bash
 cargo test
@@ -836,10 +836,10 @@ The scene has two halves:
 
 - **The pantry through the crew.** The waiter puts the 64 MiB stock in the
   pantry, and eight slips read it in place. Each one dawdles 50 ms, so the
-  slips spread across the crew, and reports its cook and the address it
+  slips spread across the crew. Each also reports its cook and the address it
   read. `sort` puts the eight cook names in order, and `dedup` then
-  removes each name that repeats the one before it — so each cook's name
-  is left once, and `cooks.len()` counts the cooks who took a share.
+  removes each name that repeats the one before it. Each cook's name
+  is then left once, and `cooks.len()` counts the cooks who took a share.
 
 `cargo run` refuses to build (the first of two errors shown in full):
 
@@ -859,20 +859,20 @@ error: could not compile `nano-ray-rs` (bin "nano-ray-rs") due to 2 previous err
 ```
 
 The crew only knows `execute` and `submit`. You could copy
-`submit_reading` and `submit_with` into `Pool` too — about fifty more
+`submit_reading` and `submit_with` into `Pool` too. That means about fifty more
 lines, the same as `Worker`'s, kept in step by hand forever. And more
-kinds of workers are coming: tomorrow's has a memory, Day 7's lives on
+kinds of workers are coming: tomorrow's has a memory, and Day 7's lives on
 another machine.
 
-Look at what those methods actually use from `self`: only two things —
+Look at what those methods actually use from `self`. There are only two things:
 where to send a job (the `Sender`) and which pass to use (the store).
 Everything else is the same for every kind of worker. Rust has a tool for
-exactly that: a **trait**. Call it `Submit` — in the story, *anyone who
+exactly that: a **trait**. Call it `Submit`. In the story, it is *anyone who
 takes slips*.
 
 A trait lists methods. Some have no body: every type that implements the
 trait must write those itself. Others have a body, written once in the
-trait — *default methods* — and every implementing type gets them for
+trait. These are *default methods*, and every implementing type gets them for
 free. In outline (not code to type):
 
 ```text
@@ -893,11 +893,11 @@ Six edits, in order. First `src/worker.rs`:
 1. Inside `impl Worker`, delete the four methods `execute`, `submit`,
    `submit_reading`, and `submit_with` — lines 53–109, from the doc
    comment that starts `/// Queue` down to the closing brace of
-   `submit_with`. `impl Worker` keeps only `start` and `start_in`; its own
+   `submit_with`. `impl Worker` keeps only `start` and `start_in`, and its own
    closing brace moves up to around line 52.
 
-2. After that closing brace, add the trait — the four methods from step 1,
-   with three small changes — and `Worker`'s side of it:
+2. After that closing brace, add the trait (the four methods from step 1,
+   with three small changes) and `Worker`'s side of it:
 
    ```rust,ignore
    // ──────── new code starts here (around line 53) ────────
@@ -990,7 +990,7 @@ Six edits, in order. First `src/worker.rs`:
      the trait itself, which is `pub`.
 
    - `self.store` became `self.store()`. Inside the trait there is no
-     field to read — only the method each kind of worker supplies.
+     field to read, only the method each kind of worker supplies.
 
    - `self.sender.…expect("worker is running")` became `self.queue()`.
      Each kind of worker decides for itself what "my queue" means:
@@ -1064,14 +1064,14 @@ Read the new lines one by one:
   `{dish:<26}` padding printed the dish itself as the label.
 
 - `8 readers on a crew of 4 -> 8 done: … ms, 0.0 MiB allocated` — eight
-  slips of 50 ms on four cooks: two rounds, about 100 ms. Not a byte
-  copied: `submit_reading` lent each slip the pot in the pantry.
+  slips of 50 ms on four cooks make two rounds, about 100 ms. Not a byte
+  was copied: `submit_reading` lent each slip the pot in the pantry.
 
 - `cooks used, bytes seen -> 4 of 4 cooks, the stock's own bytes: 8 of 8`
   — every cook in the crew took a share, and all eight read the very
   bytes the waiter put in the pantry.
 
-Four tests pin it. First, the `use` lines of three test modules — the
+Four tests pin it. First, update the `use` lines of three test modules. The
 trait's methods need the trait in scope there too:
 
 1. In `src/worker.rs`'s `mod tests`, change `use super::{Promise, Worker};`
@@ -1163,7 +1163,7 @@ trait's methods need the trait in scope there too:
 What each one proves:
 
 - `a_held_slip_takes_no_cook_while_it_waits` uses a crew of *one*. The
-  sauce's spot on the pass stays empty — nobody cooks it — and yet a
+  sauce's spot on the pass stays empty, because nobody cooks it. And yet a
   quick slip still gets cooked. If the held pasta had taken the only cook,
   that `get` would block forever. Then the test fills the sauce's spot by
   hand with `store.put`, and the pasta follows.
@@ -1196,8 +1196,8 @@ test pool::tests::one_function_drives_a_lone_cook_or_a_crew ... ok
 test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
 ```
 
-All 41 earlier tests pass — every Day 1–3 test now goes through the
-trait — plus the four new ones.
+All 41 earlier tests pass, plus the four new ones. Every Day 1–3 test now
+goes through the trait.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-04b`.
 
@@ -1214,14 +1214,14 @@ trait — plus the four new ones.
 
 Your crew finished the four slips 200 ms sooner. But look at *how* the cooks
 in sections A and B were busy: `thread::sleep`. A sleeping thread uses no
-processor at all, so a thousand sleeping cooks fit on one core. That
-proves the scheduling works; it proves nothing about speed on real work.
+processor at all, so a thousand sleeping cooks fit on one core. Sleeping cooks
+prove the scheduling works, but they prove nothing about speed on real work.
 
 So, a real job: **count the prime numbers from 1 to six million**,
-testing each number the slow way. That is pure arithmetic — it keeps one
+testing each number the slow way. The job is pure arithmetic: it keeps one
 core busy and needs nothing else. The waiter puts the six million numbers
-in the pantry once, cuts the job into 16 slips (each counts the primes in
-one sixteenth of the numbers, read in place), and adds up the 16 answers.
+in the pantry once and cuts the job into 16 slips. Each slip counts the primes in
+one sixteenth of the numbers, read in place, and the waiter adds up the 16 answers.
 Then the same job runs on a crew of 1, of 2, and of 4.
 
 Three edits to `src/main.rs`:
@@ -1331,17 +1331,17 @@ A few details:
   exactly. Bigger numbers need more tries, so they cost more.
 
 - In `count_primes`, `filter` hands its test a *reference* to each item,
-  and `numbers.iter()` already yields references — so `n` is a reference
+  and `numbers.iter()` already yields references. So `n` is a reference
   to a reference, and `**n` follows both to the number itself.
 
 - `share(all, n, slips)` is slip `n`'s part of the numbers. `div_ceil`
   divides and rounds *up* (1000 numbers in 16 slips: 63 each, the last one
-  shorter), and `&all[start..end]` is a *slice*: a view of part of a
+  shorter). `&all[start..end]` is a *slice*: a view of part of a
   vector, not a copy.
 
 - `count_on` submits all the slips first and collects the answers after.
   Collecting each answer right after submitting its slip would leave
-  three cooks idle — Ray's docs call that an anti-pattern: `ray.get` in a
+  three cooks idle. Ray's docs call that an anti-pattern: `ray.get` in a
   loop.
 
 - `time_on` starts a crew, times the job on it, and returns the answer and
@@ -1350,7 +1350,7 @@ A few details:
 
 - `thread::available_parallelism()` asks the operating system how many
   tasks this machine can run at once — usually the number of cores. It
-  returns a `Result`; `map_or(1, …)` turns an error into 1.
+  returns a `Result`, and `map_or(1, …)` turns an error into 1.
 
 - `{:.2}x` prints the speedup with two digits after the decimal point.
 
@@ -1372,7 +1372,7 @@ Read it line by line:
   ones. Yours will differ.
 
 - `the job -> primes up to 6000000, as 16 slips` — the numbers are in the
-  pantry; `put` stored them before any timing started.
+  pantry. `put` stored them before any timing started.
 
 - `a crew of 1 -> 412849 primes in 2156 ms` — the baseline: one cook does
   all 16 slips, one after another.
@@ -1380,11 +1380,11 @@ Read it line by line:
 - `a crew of 2 -> … 1136 ms, 1.90x` — a bit more than half the time.
 
 - `a crew of 4 -> … 619 ms, 3.48x` — a bit more than a quarter, but
-  clearly not a quarter.
+  still not a quarter.
 
 Every answer is 412849: the slips add up to the same count, whoever
-cooked them. The times are mine and will differ on your machine — and
-from run to run on mine; the range across runs comes after the next
+cooked them. The times are mine, and they will differ on your machine. They
+also vary from run to run on mine, and the range across runs comes after the next
 step.
 
 Why not exactly 4×? Here is a guess you can test: the slips are not
@@ -1393,9 +1393,9 @@ needs more tries in `is_prime` than the small numbers in slip 1. The crew
 is done only when its *last* slip is done. If the biggest slips come last,
 three cooks may stand idle while the fourth finishes one.
 
-Time the first and the last slip alone, then try smaller slips. At the end
+Time the first and the last slip alone, then try smaller slips. Add this at the end
 of `more_cooks_less_time`, after the `for` loop's closing brace (around
-line 369) — the `⋮` and the framing lines are already in your file:
+line 369). The `⋮` and the framing lines are already in your file:
 
 ```rust,ignore
 fn more_cooks_less_time() {
@@ -1420,7 +1420,7 @@ fn more_cooks_less_time() {
 ```
 
 `numbers.read()` borrows the six million numbers from the pantry, as on
-Day 3. The two slips are timed right on the waiter's thread, no crew
+Day 3. The two slips are timed right on the waiter's thread, with no crew
 involved. Then the whole job runs once more on a crew of 4, cut into 64
 slips instead of 16.
 
@@ -1446,35 +1446,35 @@ Read the new lines one by one:
   times the first, even though it holds fewer primes: its numbers are
   bigger, so every test takes more tries.
 
-- `a crew of 4, 64 slips -> … 571 ms, 3.65x` — smaller slips, closer to
-  4×. This is the *slip size*: how much of the job one slip carries —
-  more slips means smaller slips. With 16 slips, the last round is four
+- `a crew of 4, 64 slips -> … 571 ms, 3.65x` — smaller slips bring the crew closer to
+  4×. This is the *slip size*: how much of the job one slip carries.
+  More slips means smaller slips. With 16 slips, the last round is four
   of the most expensive slips, and the cooks finish them at different
   times. With 64 slips, the last slips are a quarter of the size, so the
   cooks' finishing times bunch up and less time is spent idle at the end.
 
 In this run the 16-slip crew of four reached 3.49×. I ran the finished
-program ten times; together with the run before this step, that makes
-eleven runs, the two shown here among them. Two cooks reached 1.81× to
+program ten times. Together with the run before this step, that makes
+eleven runs, including the two shown here. Two cooks reached 1.81× to
 1.93×, four cooks on 16 slips 3.27× to 3.63×, and four cooks on 64 slips
-3.59× to 3.86× — and in all ten runs that had both, 64 slips beat 16.
+3.59× to 3.86×. In all ten runs that had both, 64 slips beat 16.
 
 How far from perfect is that? A perfect 4× would have taken 2088 ÷ 4 =
-522 ms in this run. The 16-slip crew took 599 ms, 77 ms short; the
+522 ms in this run. The 16-slip crew took 599 ms, 77 ms short. The
 64-slip crew took 571 ms, 49 ms (about 9%) short. So unequal slips
-explain part of the gap — smaller slips won back 28 of those 77 ms. The
-remaining 49 ms I could not pin down. The waiter's own work is not it: I
+explain part of the gap: smaller slips won back 28 of those 77 ms. The
+remaining 49 ms I could not pin down. The waiter's own work is not the cause: I
 timed the same 64 slips on a handful of numbers, and the whole round
 trip — handing out the slips, the cooks taking them, adding up the
 answers — took 0.1 to 0.4 ms. The most likely cause is the operating
-system's choice of core: this chip has 6 fast cores and 12 slower ones,
-nothing in our code says which a cook runs on, and other programs on the
+system's choice of core. This chip has 6 fast cores and 12 slower ones,
+nothing in our code says which one a cook runs on, and other programs on the
 laptop were running too.
 
 Why not cut the job into a million slips, then? Because every slip has a
 fixed cost: a ticket, a spot on the pass, a trip through the rail's lock,
 and a cook waking up. With tiny slips that bookkeeping outweighs the
-cooking — Ray's tip "avoid tiny tasks".
+cooking. That is Ray's tip "avoid tiny tasks".
 
 Three tests pin the job. Append a test module to the end of
 `src/main.rs`, after the closing brace of `mib` (around line 414):
@@ -1528,8 +1528,8 @@ mod tests {
   of its own and joins those lists, end to end, into one.
 
 - `the_job_on_a_crew_gives_the_same_answer_as_one_cook` — 16 slips on a
-  crew of four give 1229, the known number of primes below 10,000. No
-  timing: tests check answers, the demo measures speed.
+  crew of four give 1229, the known number of primes below 10,000. It does no
+  timing: tests check answers, and the demo measures speed.
 
 ```bash
 cargo test
@@ -1634,13 +1634,13 @@ The whole evening in the kitchen, one stretch at a time:
   share one pot in the pantry. (`the_crew_and_the_pantry`, through the
   `Submit` trait.)
 
-- The last eight — the measurement: the same prime-counting job, 1.89×
-  as fast on two cooks and 3.49× on four in this run — a bit more than a
-  quarter of the time — and 3.65× once the slips are smaller. (`more_cooks_less_time`.)
+- The last eight — the measurement. The same prime-counting job runs 1.89×
+  as fast on two cooks and 3.49× on four in this run, a bit more than a
+  quarter of the time. It runs 3.65× once the slips are smaller. (`more_cooks_less_time`.)
 
 What varies between runs: every millisecond figure in the last eight
 lines, the `ms` of the `8 readers` line, and so every speedup. The other
-lines round to the nearest 100 ms and stay the same; every count and
+lines round to the nearest 100 ms and stay the same. Every count and
 every number of primes is the same on every run. (One honest caveat, as
 on Days 2 and 3: the first ten lines rely on `thread::sleep` to keep cooks
 visibly busy. The tests rely on gates instead.)
@@ -1672,7 +1672,7 @@ so there is nothing for a command-line test to drive.)
 <a href="https://google.github.io/comprehensive-rust/pattern-matching/let-control-flow/while-let.html"><code>while let</code></a>
 </div>
 
-Here is a shorter way to write `take_slips` — one you might well write
+Here is a shorter way to write `take_slips`, one you might well write
 yourself. `while let Ok(job) = …` repeats its body for as long as the
 pattern matches: here, as long as `recv` hands back `Ok(job)`. In
 `src/pool.rs`, replace lines 58–66 — the whole `loop { … }` inside
@@ -1758,11 +1758,11 @@ test result: FAILED. 46 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out;
 
 What happened? `rail.lock()` returns a *guard*: the lock stays held for
 as long as the guard exists. In `let next = rail.lock().unwrap().recv();`
-the guard is a temporary that is dropped at the end of that `let`
+the guard is a temporary, and Rust drops it at the end of that `let`
 statement, before the cook starts cooking. But a `while let` keeps the
 temporaries of its condition alive until the end of the loop body. So
 the cook holds the rail *while cooking*, and every other cook waits at
-the lock. Four cooks, one at the stove at a time: a crew of one. The Rust
+the lock. Four cooks, but only one at the stove at a time: a crew of one. The Rust
 book's own thread pool
 ([chapter 21](https://doc.rust-lang.org/book/ch21-02-multithreaded.html))
 warns about exactly this line, and the Rust reference spells out the rule
@@ -1813,30 +1813,30 @@ git diff v1-day-03 v1-day-04
 
 **What changed today:** you measured what choosing a cook by hand costs —
 a cook idle for 600 ms while a slip waited on the other cook's rail. A
-`Pool` puts a crew of threads behind one shared rail, an
+`Pool` puts a crew of threads behind one shared rail. The rail is an
 `Arc<Mutex<Receiver>>` that each cook locks only long enough to take the
 next slip, so the cook who is free first always gets it. The `Submit`
 trait wrote `submit`, `submit_reading`, and `submit_with` once, for a lone
 `Worker` and a `Pool` alike, so held slips and the pantry work on the crew
-unchanged. And on real work — counting primes — a crew of four ran a slow
-job in a bit more than a quarter of its time, closer to a quarter once
+unchanged. And on real work, counting primes, a crew of four ran a slow
+job in a bit more than a quarter of its time. It came closer to a quarter once
 the slips were smaller. Eleven new tests (48 in all) pin it across three
 section checkpoints (`v1-day-04a`, `v1-day-04b`, `v1-day-04c`), still with
 no dependencies.
 
-**Deliberately naive:** the crew's size is fixed when it starts; the
-scheduler knows nothing about a slip — no priorities, no idea where its
-inputs are, no idea whether it needs a GPU; every cook takes slips
-through one lock, which is fine for slips of milliseconds but would
-become the bottleneck for millions of tiny ones; you still choose the
-slip size by hand; and a cook whose job crashes outside `submit` (a raw
-`execute`) is gone for good, and the crew silently shrinks.
+**Deliberately naive:** the crew's size is fixed when it starts. The
+scheduler knows nothing about a slip: no priorities, no idea where its
+inputs are, no idea whether it needs a GPU. Every cook takes slips
+through one lock. That is fine for slips of milliseconds, but it would
+become the bottleneck for millions of tiny ones. You still choose the
+slip size by hand. And a cook whose job crashes outside `submit` (a raw
+`execute`) is gone for good, so the crew silently shrinks.
 
 **Tomorrow's limitation, resolved on Day 5:** every cook in the crew is
-interchangeable — any slip, any cook — so nothing one slip leaves behind
+interchangeable: any slip can go to any cook. So nothing one slip leaves behind
 is there for the next. That is exactly what makes the crew fast, and
 exactly what some work cannot live with: a counter, a cache, a model
-loaded once and used a thousand times. Next, a worker gets a memory
-— on Day 5, behind the bar: an **actor**, with a rail of its own, this
+loaded once and used a thousand times. On Day 5, a worker gets a memory
+behind the bar: an **actor**, with a rail of its own, this
 time on purpose. Tonight the kitchen closes with a crew on one
 rail, one pass, and one pantry — see [the restaurant](story.md).
