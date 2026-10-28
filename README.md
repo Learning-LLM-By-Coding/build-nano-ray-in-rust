@@ -176,7 +176,7 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 | 14&nbsp;✅&#8288;🔒 | When a whole node dies | A machine goes dark with several workers on it and its connections still open: the head node's word declares them dead, nobody waits forever on the dark machine, and a job still finishes on the machines left. | 2.5&nbsp;h |
 | 15&nbsp;✅&#8288;🔒 | Memory pressure | The pantry overflows: spill to disk, admit less, and survive the storm. | 2.5&nbsp;h |
 | 16&nbsp;✅&#8288;🔒 | Resources and placement | Tasks declare what they need — CPU slots, GPU slots — and the scheduler sends each one only where those are free. | 2&nbsp;h |
-| 17&nbsp;🔒 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
+| 17&nbsp;✅&#8288;🔒 | The payoff: serve LLMs on it | Run an inference engine as actors on your own cluster — a ready-made one, or the one you build in the nano-vLLM book — and close with one final benchmark. | 3&nbsp;h |
 
 ✅ = finished — the day's chapter and checkpoint tags are in this repository.
 ✅&#8288;🔒 = finished, in the Pro edition (launching soon — star or watch this repository to catch it).
