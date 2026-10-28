@@ -4,13 +4,13 @@ Build a distributed compute engine — a nano-[Ray](https://github.com/ray-proje
 — from an empty folder to a fault-tolerant cluster, in Rust, one tested
 day at a time.
 
-**Status: being written — Days 0–5 are done** (read them in
+**Status: all 18 days are written — Days 0–5 are free here** (read them in
 [`book/src`](book/src/introduction.md)). This book and
 [Build nano-vLLM in Rust](https://github.com/Learning-LLM-By-Coding/build-nano-vllm-in-rust)
 are two books of one series, written side by side. **Each book stands
 alone** — nothing here will require owning the other
-one. **Star or watch this repository** to catch the launch (and the
-launch discount).
+one. Days 6–17 are finished in the Pro edition. **Star or watch this
+repository** to catch its launch (and the launch discount).
 
 ## Why Ray?
 
@@ -148,10 +148,9 @@ end. The Pro edition carries the same runtime across machines: a real
 cluster, distributed objects and ownership, and recovery from worker,
 actor, and node failures.
 
-## The planned 18 days
+## The 18 days
 
-Days 0–5 are built; the rest is planned, and day boundaries will be
-refined as the book is written. Same shape as the first course, with a slightly longer paid
+All 18 days are written. Same shape as the first course, with a slightly longer paid
 half: the subject is bigger. Days 0–5 free in this repository (a complete
 mini-Ray on one machine), days 6–17 in the Pro edition (the distributed
 half). And nano, not Ray: the core runtime only — no autoscaler, no
@@ -180,7 +179,6 @@ placement groups, none of the libraries (Serve, Data, Train, Tune).
 
 ✅ = finished — the day's chapter and checkpoint tags are in this repository.
 ✅&#8288;🔒 = finished, in the Pro edition (launching soon — star or watch this repository to catch it).
-🔒 = Pro edition, still being written.
 
 ## The series
 
